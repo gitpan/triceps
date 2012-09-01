@@ -1,0 +1,660 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<!DOCTYPE book PUBLIC "-//OASIS//DTD DocBook XML V4.5CR3//EN"
+	"http://www.oasis-open.org/docbook/xml/4.5CR3/docbookx.dtd" [
+<!ENTITY % userents SYSTEM "file:///ENTS/user.ent" >
+%userents;
+]>
+
+<!--
+(C) Copyright 2011-2012 Sergey A. Babkin.
+This file is a part of Triceps.
+See the file COPYRIGHT for the copyright notice and license information
+-->
+
+
+<chapter id="ch_api_fund" xmlns:xi="http://www.w3.org/2001/XInclude">
+	<title>API Fundamentals</title>
+
+	<sect1 id="sc_api_lang">
+		<title>Languages and layers</title>
+
+		<para>
+		As mentioned before, at the moment Triceps provides the APIs in &Cpp; and
+		Perl. They are similar but not quite the same, because the nature of
+		the compiled and scripted languages is different. The &Cpp; API is more
+		direct and expects discipline from the programmer: if some incorrect
+		arguments are passed, everything might crash. The Perl API should never
+		crash. It should detect any incorrect use and report an orderly error.
+		Besides, the idioms of the scripted languages are different from the
+		compiled languages, and different usages become convenient.
+		</para>
+
+		<indexterm>
+			<primary>C++</primary>
+		</indexterm>
+		<para>
+		So far only the Perl API is documented in this manual. Its is considered
+		the primary one for the end users, and also richer and easier to use.
+		The &Cpp; API will be documented as well, just it didn't make the cut for
+		the version 1.0. If you're interested in the &Cpp; API, read the Perl
+		documentation first, to understand the ideas of Triceps, and then
+		look in the source code. The &Cpp; classes have very extensive comments
+		in the header files.
+		</para>
+
+		<indexterm>
+			<primary>XS</primary>
+		</indexterm>
+		<indexterm>
+			<primary>SWIG</primary>
+		</indexterm>
+		<para>
+		The Perl API is implemented in XS. Some people, may wonder, why not
+		SWIG? SWIG would automatically export the API into many languages, not
+		just Perl. The problem with SWIG is that it just maps the API
+		one-to-one. And this doesn't work any good, it makes for some very ugly
+		APIs with abilities to crash from the user code. Which then have to be
+		wrapped into more scripting code before they become usable. So then why
+		bother with SWIG, it's easier to just use the scripting language's
+		native extension methods.  Another benefit of the native XS support is
+		the access to the correct memory management.
+		</para>
+
+		<para>
+		In general, I've tried to avoid the premature optimization. The idea is
+		to get it working at all first, and then bother about working fast.
+		Except for the cases when the need for optimization looked obvious, and
+		the logic intertwined with the general design strongly ehough, that if
+		done one way, would be difficult to change in the future. We'll see, if
+		these <quote>obvious</quote> cases really turn out to be the obvious
+		wins, or will they become a premature-optimization mess.
+		</para>
+
+		<para>
+		There is usually more than one way to do something in Triceps. It has 
+		been written in layers: There is the &Cpp; API layer on the bottom, then
+		the Perl layer that closely parallels it, then more of the niceties
+		built in Perl. There is more than one way to organize the manual,
+		structuring it by features or by layers. Eventually I went in the
+		order of the major features, discussing each one of them at various
+		layers. 
+		</para>
+
+		<para>
+		I've also tried to show, how these layers are built on top of each other
+		and connected. Which might be too much detail for the first reading.
+		If you feel that something is going over your head, just skim over it.
+		It could be marked more clearly but I don't like this kind of marking.
+		I hate the side-panels in the magazines. I like the text to flow smoothly
+		and sequentially. I don't like the <quote>simplifications</quote> that
+		distort the real meaning and add all kinds of confusion. I like
+		having all the details I can get, and then I can skip over the ones
+		that look too complicated (and read them again when they start making
+		sense).
+		</para>
+
+		<para>
+		Also, a major goal of Triceps is the extendability.  And the best way
+		to learn how to extend it, is by looking up close at how it has already
+		been extended.
+		</para>
+	</sect1>
+
+	<sect1 id="sc_confessions">
+		<title>Errors, deaths and confessions</title>
+
+		<indexterm>
+			<primary>error handling</primary>
+		</indexterm>
+		<para>
+		In Perl, when a Triceps method detects an error, it has two ways of reporting it:
+		</para>
+
+		<orderedlist>
+		<listitem>
+		Set the error code in the special variable <pre>$!</pre> and return an <pre>undef</pre>.
+		This is the <quote>traditional</quote> approach that is gradually replaced by the other one.
+		</listitem>
+
+		<listitem>
+		Set the error code in the special variable <pre>$@</pre> (and also <pre>$!</pre>, 
+		for compatibility with the other way) and tell the Perl interpreter to die.
+		This is the <quote>new</quote> approach. 
+		</listitem>
+		</orderedlist>
+
+		<indexterm>
+			<primary>XS</primary>
+		</indexterm>
+		<para>
+		Currently most of the methods inplemented in &Cpp; through XS return the
+		errors in the first way but some have been converted to the new second way.
+		Changing all the code at once is a lot
+		of work, so the code is being converted to the new way gradually.
+		The methods implemented in Perl use the second way. The methods using the
+		second way are marked in their documentation as such. I hesitate to give
+		a whole list of them, because the list changes as more methods get converted
+		to the new way of error handling.
+		</para>
+
+		<para>
+		When you use the methods of the first group, you need to check their
+		return code. The common idiom is:
+		</para>
+
+<pre>
+my $table = $unit->makeTable($tabType, "EM_CALL", $name)
+	or confess "$!";
+</pre>
+
+		<indexterm>
+			<primary>die</primary>
+		</indexterm>
+		<indexterm>
+			<primary>confess</primary>
+		</indexterm>
+		<indexterm>
+			<primary>Carp</primary>
+		</indexterm>
+
+		<para>
+		It checks the return value and dies with an error message. <pre>confess</pre> is
+		a nicer form of <pre>die</pre> and comes from the module <pre>Carp</pre>.
+		<pre>Carp</pre> is a standard part of modern Perl, so all you need to do is just say
+		</para>
+
+<pre>
+use Carp;
+</pre>
+
+		<para>
+		No need to download and install anything.
+		</para>
+
+		<para>
+		The problem with the simple <pre>die</pre> is that it reports an
+		error but prints only the location where it has been called, which may
+		be ten layers deep inside a library, not a full stack trace. The
+		functions in <pre>Carp</pre> fix that. <pre>confess</pre> is 
+		the most interesting one of them. It
+		works just like <pre>die</pre> but prints the whole stack trace.
+		</para>
+
+		<para>
+		The full description of Carp is available at 
+		<ulink url="http://perldoc.perl.org/Carp.html"/>.
+		It has more functions, however I find the full
+		stack trace the most helpful thing in any case.
+		</para>
+
+		<para>
+		The nice part abour writing <pre>or confess</pre> is that the error message
+		is fully controlled. If the error happens in a template, the template
+		can produce a smarter message, telling what was wrong with it
+		arguments on the high level, for example:
+		</para>
+
+<pre>
+my $table = $unit->makeTable($tabType, "EM_CALL", $name)
+	or confess "Query2: bad table type, table creation failed: $!";
+</pre>
+
+		<para>
+		But the problem is that you need
+		to not forget writing <pre>or confess</pre> after every call. Also,
+		it's inconvenient when the result of one call is passed directly
+		to another one, like:
+		</para>
+
+<pre>
+$self->{unit}->call(
+	$self->{resLabel}->makeRowop("OP_INSERT", $rh->getRow()));
+</pre>
+
+		<para>
+		Here <pre>call()</pre> is a method with the second way of the error reporting, and
+		it doesn't need <pre>or confess</pre>. But <pre>makeRowop()</pre> and <pre>getRow()</pre> use the
+		first way. Writing <pre>or confess</pre> for each of them would work but
+		would be quite tedious:
+		</para>
+
+<pre>
+$self->{unit}->call(
+	$self->{resLabel}->makeRowop(
+		"OP_INSERT", $rh->getRow() or confess "$!"
+	) or confess "$!"
+);
+</pre>
+
+		<para>
+		Because of this, the error checking in such nested calls usually gets skipped
+		and the error manifests itself by the enveloping call dying with the XS error
+		of bad argument type. Which doesn't print the stack trace and loses the information
+		about the original error.
+		</para>
+
+		<para>
+		The <quote>new</quote> second way of error reporting is much better in this regard. It
+		reports the error where and when it happens. It executes <pre>confess</pre>
+		directly, which includes the stack trace into the error message
+		and then proceeds like classic <pre>die</pre>. This includes the code implemented
+		both in Perl and in &Cpp; XS.
+		With some exceptions though: the errors
+		detected by the code auto-generated in XS, such as bad call arguments,
+		still report through the plain <pre>die</pre>. 
+		</para>
+
+		<para>
+		There are modules to make all the cases of <pre>die</pre> work like <pre>confess</pre>,
+		<pre>Devel::SimpleTrace</pre> and <pre>Carp::Always</pre>. They work by intercepting
+		the pseudo-signals <pre>__WARN__</pre> and <pre>__DIE__</pre>. The logic of
+		<pre>Carp::Always</pre> is pretty simple, see
+		<ulink url="http://cpansearch.perl.org/src/FERREIRA/Carp-Always-0.11/lib/Carp/Always.pm"/>,
+		so if you're not feeling like installing the module, you can easily do the same directly
+		in your code.
+		</para>
+
+		<para>
+		If you want to intercept
+		the error to add more information to the message, use <pre>eval</pre>:
+		</para>
+
+<pre>
+eval { $self->{unit}->call($rowop) } or confess "Bad rowop argument:\n$@";
+</pre>
+
+		<para>
+		I have some better ideas about reporting the errors in the nested
+		templated but they need to be implemented and tried out yet.
+		</para>
+
+		<para>
+		When the Perl code inside a label or tracer or aggregator or index sorting handler dies, the &Cpp;
+		infrastructure around it catches the error. Here Triceps also has the old
+		and the new way of dealing with it. The old way just prints the error
+		on stderr and continues like nothing has happened. It's still used for
+		the tracers, aggregators and index sorting. The new way unrolls the stack trace through the
+		&Cpp; code and passes the <pre>die</pre> request to the Perl code that called it.
+		The labels have been converted to this new way. When one Perl label calls another
+		Perl label that calls the third Perl label, the call sequence goes in layers of 
+		Perl&emdash;&Cpp;&emdash;Perl&emdash;&Cpp;&emdash;Perl&emdash;&Cpp;&emdash;Perl. 
+		If that last label has its Perl code die
+		and there are no <pre>eval</pre>s in between, the stack will be correctly unwound
+		back through all these layers and reported in the error message.  The &Cpp;
+		code will include the reports of all the chained label calls as well.
+		If one of the intermediate Perl layers wraps the call in <pre>eval</pre>,
+		it will receive the error message with the stack trace up to that point.
+		</para>
+	</sect1>
+
+	<sect1 id="sc_memory_fund">
+		<title>Memory management fundamentals</title>
+
+		<indexterm>
+			<primary>memory management</primary>
+		</indexterm>
+		<para>
+		The memory is managed in Triceps using the reference counters. Each
+		Triceps object has a reference counter in it. In &Cpp; this is done
+		explicitly, in Perl it gets mostly hidden behind the Perl memory
+		management that also uses the reference counters. Mostly.
+		</para>
+
+		<indexterm>
+			<primary>Autoref</primary>
+		</indexterm>
+		<para>
+		In &Cpp; the Autoref template is used to produce the reference objects.
+		As the references are copied around between these objects, the
+		reference counts in the target objects are automatically adjusted. When
+		the reference count drops to 0, the target object gets destroyed. While
+		there are live references, the object can't get destroyed from under
+		them. All nice and well and simple, however still possible to get
+		wrong.
+		</para>
+
+		<indexterm>
+			<primary>label</primary>
+		</indexterm>
+		<para>
+		The major problem with the reference counters is the reference cycles.
+		If object A has a reference to object B, and object B has a reference
+		(possibly, indirect) to object A, then neither of them will ever be
+		destroyed. Many of these cases can be resolved by keeping a reference
+		in one direction and a plain pointer in the other. This of course
+		introduces the problem of hanging pointers, so extra care has to be
+		taken to not reference them. There also are the unpleasant situations
+		when there is absolutely no way around the reference cycles. For
+		example, the Triceps label's method may keep a reference to the next
+		label, where to send its processed results. If the labels are connected
+		into a loop (a perfectly normal occurrence), this would cause a
+		reference cycle. Here the way around is to know when all the labels are
+		no longer used (before the thread exit), and explicitly tell them to
+		clear their references to the other labels. This breaks up the cycle,
+		and then bits and pieces can be collected by the reference count logic.
+		</para>
+
+		<para>
+		The reference cycle problem can be seen all the way up into the Perl level.
+		However Triceps provides the ready solutions for its typical occurences.
+		To explain it, more about Triceps operation has to be explained first,
+		so it's described in detail later in
+		<xref linkend="ch_memory" xrefstyle="select: label quotedtitle pageabbrev"/>&xrsp;.
+		</para>
+
+		<para>
+		The reference counting may be single-threaded or multi-threaded. If an
+		object may only be used inside one thread, the references to it use the
+		faster single-threaded counting. In &Cpp; it's real important to not
+		access and not reference the single-threaded objects from multiple
+		threads. In Perl, when a new thread is created, only the multithreaded
+		objects from the parent thread become accessible for it, the rest become
+		undefined, so the issue gets handled automatically (as of version 1.0
+		even the potentially multithreaded objects are still exported to Perl
+		as single-threaded, with no connection between threads yet).
+		</para>
+
+		<indexterm>
+			<primary>wrapper</primary>
+		</indexterm>
+		<para>
+		The &Cpp; objects are exported into Perl through wrappers. The wrappers
+		perform the adaptation between Perl reference counting and Triceps
+		reference counting, and sometimes more of the helper functions. Perl
+		sees them as blessed objects, from which you can inherit and otherwise
+		treat like normal objects. 
+		</para>
+
+		<para>
+		When we say that a Perl variable <pre>$label</pre> contains a Triceps
+		label object, it really means that it contains a <i>referece</i> to
+		a label object. When it gets copied like <pre>$label2 = $label</pre>,
+		this copies the reference and now both variables refer to the same
+		label object (more exactly, even to the same wrapper object). Any 
+		changes to the object's state done through one
+		reference will also be visible through the other reference.
+		</para>
+
+		<para>
+		When the Perl references are copied between the variables, this
+		increases the Perl reference count to the same wrapper object. However
+		if an object goes into the &Cpp; land, and then is extracted back (such
+		as, create a Rowop from a Row, and then extract the Row from that
+		Rowop), a brand new wrapper gets created. It's the same underlying &Cpp;
+		object but with multiple wrappers. You can't tell that it's the same
+		object by comparing the Perl references, because they may be pointing
+		to the different wrappers. However Triceps provides the method
+		<pre>same()</pre> that compares the data inside the wrappers. It can be
+		used as
+		</para>
+
+<pre>
+$row1->same($row2)
+</pre>
+
+		<para>
+		and if it returns true, then both <pre>$row1</pre> and <pre>$row2</pre> point to the same
+		underlying row. 
+		</para>
+
+		<para>
+		Note also that if you inherit from the Triceps objects
+		and add some extra data to them, none of that data nor even your
+		derived class'es identity will be preserved when a new wrapper is created
+		from the underlying &Cpp; object.
+		</para>
+	</sect1>
+
+	<sect1 id="sc_constants">
+		<title>Triceps constants</title>
+
+		<indexterm>
+			<primary>constants</primary>
+		</indexterm>
+		<para>
+		Triceps has a number of symbolic constants that are grouped into
+		essentially enums. The constants themselves will be introduced with the
+		classes that use them, but here is the general description common to
+		them all.
+		</para>
+
+		<para>
+		In Perl they all are placed into the same namespace. Each group of
+		constants (that can be thought of as an enum) gets its name prefix. For
+		example, the operation codes are all prefixed with OP_, the enqueueing
+		modes with EM_, and so on.
+		</para>
+
+		<para>
+		The underlying constants are all integer. The way to give symbolic
+		names to constants in Perl is to define a function without arguments
+		that would return the value. Each constant has such a function defined
+		for it. For example, the opcode for the <quote>insert</quote> operation is the
+		result of function <pre>Triceps::OP_INSERT</pre>. 
+		</para>
+
+		<para>
+		Most methods that take constants as arguments are also smart enough to
+		recognise the constant names as strings, and automatically convert them
+		to integers. For example, the following calls are equivalent:
+		</para>
+
+<pre>
+$label->makeRowop(&Triceps::OP_INSERT, ...);
+$label->makeRowop("OP_INSERT", ...);
+</pre>
+
+		<para>
+		For a while I've thought that the version with
+		<pre>Triceps::OP_INSERT</pre> would be more efficient and might check
+		for correctness of the name at compile time.  But as it turns out, no,
+		on both counts. The look-up of the function by name happens at run
+		time, so there is no compile-time check.  And that look-up happens to
+		be a little slower than the one done by the Triceps &Cpp; code, so
+		there is no win there either. The string version is not only shorter
+		but also more efficient. The only win with the function is if you call it
+		once, remember the result in a variable and then reuse. Unless you're 
+		chasing the last few percent of performance in a tight loop, it's not
+		worth the trouble. Perhaps in the future the functions will be replaced
+		with the module-level variables: <i>that</i> would be both faster and
+		allow the compile-time checking with <pre>use strict</pre>.
+		</para>
+
+		<para>
+		What if you need to print out a constant in a message? Triceps provides
+		the conversion functions for each group of constants. They generally
+		are named <computeroutput>Triceps::<i>something</i>String</computeroutput>. 
+		For example,
+		</para>
+
+<pre>
+print &Triceps::opcodeString(&Triceps::OP_INSERT);
+</pre>
+
+		<indexterm>
+			<primary>error handling</primary>
+		</indexterm>
+		<para>
+		would print <quote>OP_INSERT</quote> If the argument is out of range of
+		the valid enums, it would return <pre>undef</pre> (but not set any error
+		message in <pre>$!</pre>, since it's not a fatal error).
+		</para>
+
+		<para>
+		There also are functions to convert from strings to constant values.
+		They generally are named <computeroutput>Triceps::string<i>Something</i></computeroutput>. 
+		For example,
+		</para>
+
+<pre>
+&Triceps::stringOpcode("OP_INSERT")
+</pre>
+
+		<para>
+		would return the integer value of <pre>Triceps::OP_INSERT</pre>. If the
+		string name is not valid for this kind of constants, it would also
+		return <pre>undef</pre>.
+		</para>
+	</sect1>
+
+	<sect1 id="sc_objprint">
+		<title>Printing the object contents</title>
+
+		<indexterm>
+			<primary>print</primary>
+		</indexterm>
+		<para>
+		When debugging the programs, it's important to find from the error
+		messages, what is going on, what kinds of objects are getting involved.
+		Because of this, many of the Triceps objects provide a way to print out
+		their contents into a string. This is done with the method
+		<pre>print()</pre>. The simplest use is as follows:
+		</para>
+
+<pre>
+$message = "Error in object " . $object->print();
+</pre>
+
+		<para>
+		Most of the objects tend to have a pretty complicated internal
+		structure and are printed on multiple lines. They look better when the
+		components are appropriately indented. The default call prints as if
+		the basic message is un-indented, and indents every extra level by 2
+		spaces.
+		</para>
+
+		<para>
+		This can be changed with extra arguments. The general format of
+		<pre>print()</pre> is:
+		</para>
+
+<programlisting>$object-&gt;print(<i>[$indent, [$subindent] ]</i>)</programlisting>
+
+		<para>
+		where <i>$indent</i> is the initial indentation, and <i>$subindent</i> is
+		the additional indentation for every level. The default <pre>print()</pre> is
+		equivalent to <pre>print("", "  ")</pre>.
+		</para>
+
+		<para>
+		A special case is
+		</para>
+
+<pre>
+$object->print(undef)
+</pre>
+
+		<para>
+		It prints the object in a single line, without line breaks.
+		</para>
+
+		<para>
+		Here is an example of how a row type object would get printed. The details
+		of the row types will be described later, for now just assume that a
+		row type is defined as:
+		</para>
+
+<pre>
+$rt1 = Triceps::RowType->new(
+	a => "uint8",
+	b => "int32",
+	c => "int64",
+	d => "float64",
+	e => "string",
+);
+</pre>
+
+		<para>
+		Then <pre>$rt1->print()</pre> produces:
+		</para>
+
+<pre>
+row {
+  uint8 a,
+  int32 b,
+  int64 c,
+  float64 d,
+  string e,
+}
+</pre>
+
+		<para>
+		With extra arguments <pre>$rt1->print("++", "--")</pre>:
+		</para>
+
+<pre>
+row {
+++--uint8 a,
+++--int32 b,
+++--int64 c,
+++--float64 d,
+++--string e,
+++}
+</pre>
+
+		<para>
+		The first line doesn't have a <quote>++</quote> because the
+		assumption is that the text gets appended to some other text
+		already on this line, so any prefixes are used only for the
+		following lines.
+		</para>
+
+		<para>
+		And finally with an undef argument <pre>$rt1->print(undef)</pre>:
+		</para>
+
+<pre>
+row { uint8 a, int32 b, int64 c, float64 d, string e, }
+</pre>
+
+		<indexterm>
+			<primary>printP</primary>
+		</indexterm>
+		<para>
+		The Rows and Rowops do not have the <pre>print()</pre> method.
+		That's largely because the &Cpp; code does not deal with printing
+		the actual data, this is left to the Perl code. So instead
+		they have the method <pre>printP()</pre> that does a similar
+		job. Only it's simpler and doesn't have any of the indenting
+		niceties. It always prints the data in a single line. The <quote>P</quote> 
+		in <quote>printP</quote> stands for <quote>Perl</quote>. The name
+		is also different because of this lack of indenting niceties.
+		See more about it in the 
+		<xref linkend="sc_Rows" xrefstyle="select: label quotedtitle pageabbrev"/>&xrsp;. 
+		</para>
+	</sect1>
+
+	<sect1 id="sc_hungarian">
+		<title>The Hungarian notation</title>
+
+		<para>
+		The Hungarian notation is the idea that the name of each variable
+		should be prefixed with some abbreviation of its type. It has probably
+		become most widely known from the Microsoft operating systems.
+		</para>
+
+		<para>
+		Overall it's a complete abomination and brain damage. But 
+		I'm using it widely in the examples in this manual. Why? The problem is that there
+		usually too many components for one logical purpose. For a table, there
+		would be a row type, a table type, and the table itself. Rather than
+		inventing separate names for them, it's easier to have a common name
+		and an uniform prefix. Eventually something better would have to be
+		done but for now I've fallen back on the Hungarian notation.
+		One possibility is to just not give names to the intermediate
+		entities. Say just have a named table, and then there would be
+		the the type of the table and the row type of the table.
+		</para>
+
+		<para>
+		Among the CEP systems, Triceps is not unique in the Hungarian notation
+		department. Coral8/Sybase CCL has this mess of lots of schemas, input
+		streams, windows and output streams, with the same naming problems. The
+		uniform naming prefixes or suffixes help making this mess more
+		navigable. I haven't actually used StreamBase but from reading the
+		documentation I get the feeling that the Hungarian notation is probably
+		useful for its SQL as well.
+		</para>
+	</sect1>
+</chapter>

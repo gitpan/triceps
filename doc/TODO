@@ -1,0 +1,45 @@
+Things that need to be done:
+* redo the errors to confess
+* more features for the SimpleAggregator
+* in RowHandle add getTable()
+* add the row contents access methods directly on a row handle?
+* in Row add the array index argument in get(), a version of get by index
+* add get() and friends directly on Rowop
+* iteration backwards
+* identify a group for iteration by the pair (parent index type, leaf index type)
+* an encapsulation of iteration range: begin, end, direction, maybe level of the step, group
+* add $unit->makeLabelFrom() - a computational block with input and output labels,
+  input chained from another label
+* add option fromLabel throughout templates
+* change options to capitalized
+* add a Sequence template, that calls its multiple output labels in order
+* a pseudo-table that keeps only the state of the additive aggregations, without actual data
+  (the data just passes through and gets immediately aggregated)
+* convert everything to croak on errors (at least, the non-ignorable ones)
+* option in labels, tracers etc. to not rethrow the Perl errors but just print them
+* replace the exceptions with returning error bufs?
+* replace all direct Perl_croak() with a smart stack unroll
+* in Table, do something about collapsing empty groups on exception?
+* in FIFO index, add options to match on exact or on first, or never match,
+  and by default throw an exception
+* snapshot queries in small portions (would need a comparison per key)
+* should it throw from Unit::clearLabels(), and if called from a destructor, 
+  catch it there?
+* for basic persistence, add dump of tables, quick disconnect of results on reload
+* register error messages from the outside scopes, to be printed on failure in the called functions
+* in Tray handle the undefs and NULLs better (see XXX)
+* rewrite makeLoop* with a Loop object
+* make the Perl tracer with row contents a standard Triceps object
+* in the C++-underlying-Perl objects have a place to keep $self,
+  with $obj->getSelf()->{CLASS} containing the blessing.
+* when printing table types and such, make sure to \-escape the funny characters
+* change the XS type checking to confess instead of plain dying
+* in Triceps::Fields::makeTranslation take the filter specs as arguments, and the caller's name
+
+* doc: the SQLy way, refer to the filtering example in sc_joins_lookup_manual
+
+App ideas:
+* queries on CSV files
+* distributed cron
+* data cache
+
