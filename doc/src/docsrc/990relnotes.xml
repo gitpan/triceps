@@ -27,6 +27,94 @@ See the file COPYRIGHT for the copyright notice and license information
 
 -->
 
+	<sect1 id="sc_notes_1_1_0">
+		<title>Release 1.1.0</title>
+
+		<itemizedlist>
+			<listitem>
+			Documentation for the &Cpp; API.
+			</listitem>
+
+			<listitem>
+			Streaming functions.
+			</listitem>
+
+			<listitem>
+			No more copy trays in the tables, they got replaced by treating the table
+			as a streaming function (the automatically generated FnReturn).
+			</listitem>
+
+			<listitem>
+			When a hashed index type is initialized, its match() method 
+			takes the field name-to-index translation into account, and matches
+			even if the key field names are different but translating to the
+			same indexes.
+			</listitem>
+
+			<listitem>
+			The recusrion is now permitted, and the limits on it can be adjusted
+			per-unit (the defaults still forbid it). The labels can be marked
+			non-re-entrant to forbid the recursion on them.
+			</listitem>
+
+			<listitem>
+			The execution of rowops enqueued by fork() and loopAt() has changed:
+			now they reuse the parent's stack frame. This changed the looping
+			logic: the marks are now set on the current, not parent's frame,
+			and the makeLoop* calls don't need, don't create and don't return
+			the begin label.
+			</listitem>
+
+			<listitem>
+			The change in the execution of forked rowops led to the different
+			trace sequence, and a modified set of TraceWhen states. The 
+			<quote>before</quote> and <quote>after</quote> states now always come in pairs, and there
+			are methods to generally differentiate between them.
+			</listitem>
+
+			<listitem>
+			The Labels are marked as cleared before their subclass clearing function
+			is called, not after it. The repeated calls to clear them are ignored.
+			</listitem>
+
+			<listitem>
+			The Unit ignores the attempts to remember, forget or clear labels while
+			it's already clearing labels.
+			</listitem>
+
+			<listitem>
+			Added <pre>Table::clear()</pre>.
+			</listitem>
+
+			<listitem>
+			Added handling of the broken Perl versions that return spurious errors on
+			the command execution.
+			</listitem>
+
+			<listitem>
+			Better &Cpp; NameSet constructors.
+			</listitem>
+
+			<listitem>
+			The &Cpp; API always throws Exceptions instead of direct abort().
+			</listitem>
+
+			<listitem>
+			In the &Cpp; API AggregatorType accept the NULL result row type until
+			the initialization is completed.
+			</listitem>
+
+			<listitem>
+			In &Cpp; added a Rhref constructor directly from FdataVec.
+			</listitem>
+
+			<listitem>
+			In &Cpp; added the method <pre>Label::adopt()</pre>, making it easier
+			to remember.
+			</listitem>
+		</itemizedlist>
+	</sect1>
+
 	<sect1 id="sc_notes_1_0_1">
 		<title>Release 1.0.1</title>
 

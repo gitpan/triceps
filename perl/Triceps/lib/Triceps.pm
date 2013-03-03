@@ -32,7 +32,7 @@ our @EXPORT = qw(
 	
 );
 
-our $VERSION = 'v1.0.1';
+our $VERSION = 'v1.0.91';
 
 sub AUTOLOAD {
     # This AUTOLOAD is used to 'autoload' constants from the constant()
@@ -112,6 +112,11 @@ require Triceps::SimpleAggregator;
 require Triceps::Collapse;
 require Triceps::LookupJoin;
 require Triceps::JoinTwo;
+# The X subpackages contain the eXperimental, eXample, eXtraneous code.
+require Triceps::X::SimpleServer;
+require Triceps::X::DumbClient;
+require Triceps::X::TestFeed;
+require Triceps::X::Tql;
 
 # Autoload methods go after =cut, and are processed by the autosplit program.
 

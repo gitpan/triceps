@@ -564,35 +564,31 @@ UTESTCASE chaining(Utest *utest)
 
 	string expect = 
 		"unit 'u' before label 'lab1' op OP_INSERT {\n"
-		"unit 'u' drain label 'lab1' op OP_INSERT\n"
-		"unit 'u' before-chained label 'lab1' op OP_INSERT\n"
+		"unit 'u' before-chained label 'lab1' op OP_INSERT {\n"
 			"unit 'u' before label 'lab2' (chain 'lab1') op OP_INSERT {\n"
-			"unit 'u' drain label 'lab2' (chain 'lab1') op OP_INSERT\n"
-			"unit 'u' before-chained label 'lab2' (chain 'lab1') op OP_INSERT\n"
+			"unit 'u' before-chained label 'lab2' (chain 'lab1') op OP_INSERT {\n"
 				"unit 'u' before label 'lab3' (chain 'lab2') op OP_INSERT {\n"
-				"unit 'u' drain label 'lab3' (chain 'lab2') op OP_INSERT\n"
 				"unit 'u' after label 'lab3' (chain 'lab2') op OP_INSERT }\n"
+			"unit 'u' after-chained label 'lab2' (chain 'lab1') op OP_INSERT }\n"
 			"unit 'u' after label 'lab2' (chain 'lab1') op OP_INSERT }\n"
 
 			"unit 'u' before label 'lab3' (chain 'lab1') op OP_INSERT {\n"
-			"unit 'u' drain label 'lab3' (chain 'lab1') op OP_INSERT\n"
 			"unit 'u' after label 'lab3' (chain 'lab1') op OP_INSERT }\n"
+		"unit 'u' after-chained label 'lab1' op OP_INSERT }\n"
 		"unit 'u' after label 'lab1' op OP_INSERT }\n"
 
 		"unit 'u' before label 'lab1' op OP_DELETE {\n"
-		"unit 'u' drain label 'lab1' op OP_DELETE\n"
-		"unit 'u' before-chained label 'lab1' op OP_DELETE\n"
+		"unit 'u' before-chained label 'lab1' op OP_DELETE {\n"
 			"unit 'u' before label 'lab2' (chain 'lab1') op OP_DELETE {\n"
-			"unit 'u' drain label 'lab2' (chain 'lab1') op OP_DELETE\n"
-			"unit 'u' before-chained label 'lab2' (chain 'lab1') op OP_DELETE\n"
+			"unit 'u' before-chained label 'lab2' (chain 'lab1') op OP_DELETE {\n"
 				"unit 'u' before label 'lab3' (chain 'lab2') op OP_DELETE {\n"
-				"unit 'u' drain label 'lab3' (chain 'lab2') op OP_DELETE\n"
 				"unit 'u' after label 'lab3' (chain 'lab2') op OP_DELETE }\n"
+			"unit 'u' after-chained label 'lab2' (chain 'lab1') op OP_DELETE }\n"
 			"unit 'u' after label 'lab2' (chain 'lab1') op OP_DELETE }\n"
 
 			"unit 'u' before label 'lab3' (chain 'lab1') op OP_DELETE {\n"
-			"unit 'u' drain label 'lab3' (chain 'lab1') op OP_DELETE\n"
 			"unit 'u' after label 'lab3' (chain 'lab1') op OP_DELETE }\n"
+		"unit 'u' after-chained label 'lab1' op OP_DELETE }\n"
 		"unit 'u' after label 'lab1' op OP_DELETE }\n"
 	;
 
@@ -607,7 +603,7 @@ UTESTCASE chaining(Utest *utest)
 	unit->schedule(op2);
 	unit->drainFrame();
 	UT_ASSERT(unit->empty());
-	UT_IS(trace2->getBuffer()->size(), 28);
+	UT_IS(trace2->getBuffer()->size(), 24);
 	// uncomment to check visually
 	// printf("StringTracer got:\n%s", trace2->getBuffer()->print().c_str());
 
@@ -867,11 +863,11 @@ public:
 
 		// fprintf(stderr, "DEBUG LabelNextLoop mark at %p val increased to %d\n", mark_->getFrame(), val);
 		if (useTray_) {
-			unit_->loopAt(mark_, new Rowop(next_, Rowop::OP_DELETE, type_->makeRow(dv)));
-		} else {
 			Autoref<Tray> tray = new Tray;
 			tray->push_back(new Rowop(next_, Rowop::OP_DELETE, type_->makeRow(dv)));
 			unit_->loopTrayAt(mark_, tray);
+		} else {
+			unit_->loopAt(mark_, new Rowop(next_, Rowop::OP_DELETE, type_->makeRow(dv)));
 		}
 	}
 
@@ -914,7 +910,7 @@ UTESTCASE markLoop(Utest *utest)
 	// send a record to unset mark - same as schedule()
 	UT_ASSERT(unit->empty());
 	unit->schedule(new Rowop(ldummy, Rowop::OP_DELETE, r1)); // to precede the loop
-	unit->loopAt(mark1, new Rowop(lstart, Rowop::OP_NOP, r1));
+	unit->loopAt(mark1, new Rowop(lstart, Rowop::OP_NOP, r1)); // sends to outermost frame
 	unit->schedule(new Rowop(ldummy, Rowop::OP_INSERT, r1)); // to follow after the loop
 	UT_ASSERT(!unit->empty());
 
@@ -929,32 +925,36 @@ UTESTCASE markLoop(Utest *utest)
 		"unit 'u' before label 'ldummy' op OP_DELETE\n"
 		"unit 'u' before label 'lstart' op OP_NOP\n"
 
-		// these have been enqueued with EM_FORK on lnext
+		// LabelStartLoop executes and for the first iteration
+		// forks 3 rowops for lnext.
 		"unit 'u' before label 'lnext' op OP_NOP\n"
 		"unit 'u' before label 'lnext' op OP_NOP\n"
 		"unit 'u' before label 'lnext' op OP_NOP\n"
 
-		// lnext puts things to the outermost frame
+		// LabelStartLoop moves the mark1 to itself,
+		// so the whole loop gets through before the lstart frame
+		// completes and returns.
+		// These go in this order because of the EM_CALL on lnext.
+		"unit 'u' before label 'lstart' op OP_DELETE\n"
+		"unit 'u' before label 'lnext' op OP_INSERT\n"
+		"unit 'u' before label 'lstart' op OP_DELETE\n"
+		"unit 'u' before label 'lnext' op OP_INSERT\n"
+		"unit 'u' before label 'lstart' op OP_DELETE\n"
+		"unit 'u' before label 'lnext' op OP_INSERT\n"
+
+		"unit 'u' before label 'lstart' op OP_DELETE\n"
+		"unit 'u' before label 'lnext' op OP_INSERT\n"
+		"unit 'u' before label 'lstart' op OP_DELETE\n"
+		"unit 'u' before label 'lnext' op OP_INSERT\n"
+		"unit 'u' before label 'lstart' op OP_DELETE\n"
+		"unit 'u' before label 'lnext' op OP_INSERT\n"
+
+		"unit 'u' before label 'lstart' op OP_DELETE\n"
+		"unit 'u' before label 'lstart' op OP_DELETE\n"
+		"unit 'u' before label 'lstart' op OP_DELETE\n"
+
+		// Finally the next item from the outermost frame executes.
 		"unit 'u' before label 'ldummy' op OP_INSERT\n"
-
-		// these go in this order because of the EM_CALL on lnext
-		"unit 'u' before label 'lstart' op OP_DELETE\n"
-		"unit 'u' before label 'lnext' op OP_INSERT\n"
-		"unit 'u' before label 'lstart' op OP_DELETE\n"
-		"unit 'u' before label 'lnext' op OP_INSERT\n"
-		"unit 'u' before label 'lstart' op OP_DELETE\n"
-		"unit 'u' before label 'lnext' op OP_INSERT\n"
-
-		"unit 'u' before label 'lstart' op OP_DELETE\n"
-		"unit 'u' before label 'lnext' op OP_INSERT\n"
-		"unit 'u' before label 'lstart' op OP_DELETE\n"
-		"unit 'u' before label 'lnext' op OP_INSERT\n"
-		"unit 'u' before label 'lstart' op OP_DELETE\n"
-		"unit 'u' before label 'lnext' op OP_INSERT\n"
-
-		"unit 'u' before label 'lstart' op OP_DELETE\n"
-		"unit 'u' before label 'lstart' op OP_DELETE\n"
-		"unit 'u' before label 'lstart' op OP_DELETE\n"
 	;
 
 	UT_IS(tlog, expect_sched);
@@ -1138,7 +1138,11 @@ UTESTCASE exceptions(Utest *utest)
 	UT_IS(msg, "Test throw on call\nCalled through the label 'labt'.\n");
 	UT_ASSERT(unit1->empty()); // the frame must get popped
 
-	// draining of the frame, even if the exception is thrown in a recursive call
+	// draining of the frame, even if the exception is thrown in a recursive call;
+	// and also the max stack depth limit 
+	// (the max recusrion depth limit is tested with the labels)
+	unit1->setMaxStackDepth(3);
+	unit1->setMaxRecursionDepth(10);
 	msg.clear();
 	try {
 		Autoref<Label> labrec = new LabelRecursive(unit1, rt1, "labrec");
@@ -1151,9 +1155,13 @@ UTESTCASE exceptions(Utest *utest)
 	} catch (Exception e) {
 		msg = e.getErrors()->print();
 	}
+	unit1->setMaxStackDepth(0);
+	unit1->setMaxRecursionDepth(1);
 	UT_IS(msg, 
-		"Detected a recursive call of the label 'labrec'.\n"
+		"Unit 'u1' exceeded the stack depth limit 3, current depth 4, when calling the label 'labrec'.\n"
+		"Called through the label 'labrec'.\n"
 		"Called through the label 'labrec'.\n");
+
 	UT_ASSERT(unit1->empty());
 
 	Exception::abort_ = true; // restore back
@@ -1169,11 +1177,30 @@ public:
 
 	virtual void execute(Unit *unit, const Label *label, const Label *fromLabel, Rowop *rop, Unit::TracerWhen when)
 	{
+		// printf("trace %s label '%s' %c\n", Unit::tracerWhenHumanString(when), label->getName().c_str(), Unit::tracerWhenIsBefore(when)? '{' : '}');
 		if (when == when_)
 			throw Exception("exception in tracer", true);
 	}
 
 	Unit::TracerWhen when_;
+};
+
+class ForkingLabel : public Label
+{
+public:
+	ForkingLabel(Unit *unit, Onceref<RowType> rtype, const string &name,
+			Onceref<Label> next) :
+		Label(unit, rtype, name),
+		next_(next)
+	{ }
+
+	virtual void execute(Rowop *arg) const
+	{
+		// printf("forking\n");
+		unit_->fork(next_->adopt(arg));
+	}
+
+	Autoref<Label> next_;
 };
 
 // test the exception propagation through the labels
@@ -1212,10 +1239,28 @@ UTESTCASE label_exceptions(Utest *utest)
 	} catch (Exception e) {
 		msg = e.getErrors()->print();
 	}
-	UT_IS(msg, "Detected a recursive call of the label 'lab1'.\n\
+	UT_IS(msg, "Exceeded the unit recursion depth limit 1 (attempted 2) on the label 'lab1'.\n\
 Called through the label 'labrec'.\n\
 Called chained from the label 'lab2'.\n\
 Called chained from the label 'lab1'.\n");
+
+	// recursive call of a non-reentrant label
+	unit1->setMaxRecursionDepth(3);
+	msg.clear();
+	try {
+		Autoref<Label> labrec = new LabelRecursive(unit1, rt1, "labrec");
+		UT_ASSERT(!labrec->isNonReentrant());
+		labrec->setNonReentrant();
+		UT_ASSERT(labrec->isNonReentrant());
+
+		Autoref<Rowop> oprec = new Rowop(labrec, Rowop::OP_DELETE, r1);
+		unit1->call(oprec);
+	} catch (Exception e) {
+		msg = e.getErrors()->print();
+	}
+	unit1->setMaxRecursionDepth(1);
+	UT_IS(msg, "Detected a recursive call of the non-reentrant label 'labrec'.\n\
+Called through the label 'labrec'.\n");
 
 	// wrong unit
 	msg.clear();
@@ -1248,10 +1293,11 @@ Called chained from the label 'lab1'.\n");
 	}
 	UT_IS(msg, "Error when tracing before the label 'lab1':\n  exception in tracer\n");
 
-	// tracer throws on BEFORE_DRAIN
+	// tracer throws on AFTER;
+	// also propagation of the exception through chaining
 	msg.clear();
 	try {
-		Autoref<Unit::Tracer> tracer1 = new ThrowingTracer(Unit::TW_BEFORE_DRAIN);
+		Autoref<Unit::Tracer> tracer1 = new ThrowingTracer(Unit::TW_AFTER);
 		unit1->setTracer(tracer1);
 
 		Autoref<Label> lab1 = new DummyLabel(unit1, rt1, "lab1");
@@ -1264,7 +1310,7 @@ Called chained from the label 'lab1'.\n");
 	} catch (Exception e) {
 		msg = e.getErrors()->print();
 	}
-	UT_IS(msg, "Error when tracing before draining the label 'lab1':\n  exception in tracer\n");
+	UT_IS(msg, "Error when tracing after execution of the label 'lab2':\n  exception in tracer\nCalled chained from the label 'lab1'.\n");
 
 	// tracer throws on BEFORE_CHAINED
 	msg.clear();
@@ -1284,11 +1330,10 @@ Called chained from the label 'lab1'.\n");
 	}
 	UT_IS(msg, "Error when tracing before the chain of the label 'lab1':\n  exception in tracer\n");
 
-	// tracer throws on AFTER;
-	// also propagation of the exception through chaining
+	// tracer throws on AFTER_CHAINED
 	msg.clear();
 	try {
-		Autoref<Unit::Tracer> tracer1 = new ThrowingTracer(Unit::TW_AFTER);
+		Autoref<Unit::Tracer> tracer1 = new ThrowingTracer(Unit::TW_AFTER_CHAINED);
 		unit1->setTracer(tracer1);
 
 		Autoref<Label> lab1 = new DummyLabel(unit1, rt1, "lab1");
@@ -1301,7 +1346,39 @@ Called chained from the label 'lab1'.\n");
 	} catch (Exception e) {
 		msg = e.getErrors()->print();
 	}
-	UT_IS(msg, "Error when tracing after execution of the label 'lab2':\n  exception in tracer\nCalled chained from the label 'lab1'.\n");
+	UT_IS(msg, "Error when tracing after the chain of the label 'lab1':\n  exception in tracer\n");
+
+	// tracer throws on BEFORE_DRAIN
+	msg.clear();
+	try {
+		Autoref<Unit::Tracer> tracer1 = new ThrowingTracer(Unit::TW_BEFORE_DRAIN);
+		unit1->setTracer(tracer1);
+
+		Autoref<Label> lab2 = new DummyLabel(unit1, rt1, "lab2");
+		Autoref<Label> lab1 = new ForkingLabel(unit1, rt1, "lab1", lab2);
+
+		Autoref<Rowop> oprec = new Rowop(lab1, Rowop::OP_DELETE, r1);
+		unit1->call(oprec);
+	} catch (Exception e) {
+		msg = e.getErrors()->print();
+	}
+	UT_IS(msg, "Error when tracing before draining the label 'lab1':\n  exception in tracer\n");
+
+	// tracer throws on AFTER_DRAIN
+	msg.clear();
+	try {
+		Autoref<Unit::Tracer> tracer1 = new ThrowingTracer(Unit::TW_AFTER_DRAIN);
+		unit1->setTracer(tracer1);
+
+		Autoref<Label> lab2 = new DummyLabel(unit1, rt1, "lab2");
+		Autoref<Label> lab1 = new ForkingLabel(unit1, rt1, "lab1", lab2);
+
+		Autoref<Rowop> oprec = new Rowop(lab1, Rowop::OP_DELETE, r1);
+		unit1->call(oprec);
+	} catch (Exception e) {
+		msg = e.getErrors()->print();
+	}
+	UT_IS(msg, "Error when tracing after draining the label 'lab1':\n  exception in tracer\n");
 
 	Exception::abort_ = true; // restore back
 	Exception::enableBacktrace_ = true; // restore back

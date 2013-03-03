@@ -35,6 +35,14 @@ Errors::Errors(const char *msg) :
 	appendMultiline(true, msg);
 }
 
+Errors::Errors(const string &msg, Autoref<Errors> clde) :
+	error_(true)
+{
+	appendMultiline(true, msg);
+	if (!clde.isNull())
+		elist_.push_back(Epair(string(), clde));
+}
+
 bool Errors::append(const string &msg, Autoref<Errors> clde)
 {
 	if (clde.isNull())
@@ -130,6 +138,19 @@ void Errors::clear()
 {
 	elist_.clear();
 	error_ = false;
+}
+
+bool errefAppend(Erref &ref, const string &msg, Autoref<Errors> clde)
+{
+	if (!clde->hasError())
+		return false;
+
+	if (ref.isNull())
+		ref = new Errors(msg, clde);
+	else
+		ref->append(msg, clde);
+
+	return true;
 }
 
 }; // TRICEPS_NS

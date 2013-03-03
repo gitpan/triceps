@@ -7,7 +7,7 @@
 
 package Triceps::Collapse;
 
-our $VERSION = 'v1.0.1';
+our $VERSION = 'v1.0.91';
 
 use Carp;
 use strict;
@@ -41,6 +41,10 @@ sub new # ($class, $optName => $optValue, ...)
 		name => [ undef, \&Triceps::Opt::ck_mandatory ],
 		data => [ undef, sub { &Triceps::Opt::ck_mandatory(@_); &Triceps::Opt::ck_ref(@_, "ARRAY") } ],
 	}, @_);
+
+	# Keeps the names of the datasets in the order they have been defined
+	# (since the hash loses the order).
+	$self->{dsetnames} = [];
 	
 	# parse the data element
 	my $dataref = $self->{data};
@@ -54,6 +58,7 @@ sub new # ($class, $optName => $optValue, ...)
 	}, @$dataref);
 
 	# save the dataset for the future
+	push @{$self->{dsetnames}}, $dataset->{name};
 	$self->{datasets}{$dataset->{name}} = $dataset;
 	# check the options
 	&Triceps::Opt::handleUnitTypeLabel("Triceps::Collapse data set (". $dataset->{name} . ")",
@@ -72,7 +77,7 @@ sub new # ($class, $optName => $optValue, ...)
 
 	$dataset->{tbInsert} = $self->{unit}->makeTable($dataset->{tt}, "EM_CALL", $self->{name} . "." . $dataset->{name} . ".tbInsert")
 		or confess "Collapse internal error: insert table creation for dataset '" . $dataset->{name} . "':\n$! ";
-	$dataset->{tbDelete} = $self->{unit}->makeTable($dataset->{tt}, "EM_CALL", $self->{name} . "." . $dataset->{name} . ".tbInsert")
+	$dataset->{tbDelete} = $self->{unit}->makeTable($dataset->{tt}, "EM_CALL", $self->{name} . "." . $dataset->{name} . ".tbDelete")
 		or confess "Collapse internal error: delete table creation for dataset '" . $dataset->{name} . "':\n$! ";
 
 	# create the labels
@@ -168,7 +173,27 @@ sub getOutputLabel($$) # ($self, $dsetname)
 sub getDatasets($) # ($self)
 {
 	my $self = shift;
-	return keys %{$self->{datasets}};
+	return @{$self->{dsetnames}};
+}
+
+# Similar to Table's fnReturn(), creates the FnReturn on the first call.
+# The resulting FnReturn has one label for each dataset, named after it.
+# The order of the labels is preserved from the definition order of the
+# datasets.
+sub fnReturn # (self)
+{
+	my $self = shift;
+	if (!defined $self->{fret}) {
+		my @labels;
+		for my $n (@{$self->{dsetnames}}) {
+			push @labels, $n, $self->{datasets}{$n}{lbOut};
+		}
+		$self->{fret} = Triceps::FnReturn->new(
+			name => $self->{name} . ".fret",
+			labels => \@labels,
+		);
+	}
+	return $self->{fret};
 }
 
 # TODO In the future may also have separate calls for latching and unlatching.

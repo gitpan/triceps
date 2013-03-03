@@ -34,17 +34,81 @@ Exception::Exception(const string &err, bool trace) :
 	checkAbort();
 }
 
+Exception::Exception(Onceref<Errors> err, const string &msg) :
+	error_(new Errors(msg, err))
+{
+	checkTrace(false); // really does nothing
+	checkAbort();
+}
+
+Exception::Exception(Onceref<Errors> err, const char *msg) :
+	error_(new Errors(msg, err))
+{
+	checkTrace(false); // really does nothing
+	checkAbort();
+}
+
+Exception::Exception(const Exception &exc, const string &msg) :
+	error_(new Errors(msg, exc.getErrors()))
+{
+	checkTrace(false); // really does nothing
+	checkAbort();
+}
+
+Exception::Exception()
+{ }
+
+Exception Exception::f(const char *fmt, ...)
+{
+	va_list ap;
+	va_start(ap, fmt);
+	string msg = vstrprintf(fmt, ap);
+	va_end(ap);
+
+	return Exception(msg, false);
+}
+
+Exception Exception::fTrace(const char *fmt, ...)
+{
+	va_list ap;
+	va_start(ap, fmt);
+	string msg = vstrprintf(fmt, ap);
+	va_end(ap);
+
+	return Exception(msg, true);
+}
+
+Exception Exception::f(Onceref<Errors> err, const char *fmt, ...)
+{
+	va_list ap;
+	va_start(ap, fmt);
+	string msg = vstrprintf(fmt, ap);
+	va_end(ap);
+
+	return Exception(err, msg);
+}
+
+Exception Exception::f(const Exception &exc, const char *fmt, ...)
+{
+	va_list ap;
+	va_start(ap, fmt);
+	string msg = vstrprintf(fmt, ap);
+	va_end(ap);
+
+	return Exception(exc, msg);
+}
+
 Exception::~Exception()
 	throw()
 { }
 
-const char *Exception::what()
+const char *Exception::what() const throw()
 {
 	error_->printTo(what_);
 	return what_.c_str();
 }
 
-Errors *Exception::getErrors()
+Errors *Exception::getErrors() const
 {
 	return error_.get();
 }

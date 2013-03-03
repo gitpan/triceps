@@ -7,7 +7,7 @@
 
 package Triceps::JoinTwo;
 
-our $VERSION = 'v1.0.1';
+our $VERSION = 'v1.0.91';
 
 use Carp;
 
@@ -454,6 +454,22 @@ sub getOverrideKeyTypes # (self)
 {
 	my $self = shift;
 	return $self->{overrideKeyTypes};
+}
+
+# Similar to Table's fnReturn(), creates the FnReturn on the first call.
+# The resulting FnReturn has one label "out".
+sub fnReturn # (self)
+{
+	my $self = shift;
+	if (!defined $self->{fret}) {
+		$self->{fret} = Triceps::FnReturn->new(
+			name => $self->{name} . ".fret",
+			labels => [
+				out => $self->{outputLabel},
+			],
+		);
+	}
+	return $self->{fret};
 }
 
 1;

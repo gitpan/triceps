@@ -12,6 +12,7 @@
 #include <type/AllTypes.h>
 #include <sched/AggregatorGadget.h>
 #include <common/StringUtil.h>
+#include <common/Exception.h>
 
 // Make fields of all simple types
 void mkfields(RowType::FieldVec &fields)
@@ -41,6 +42,24 @@ void mkfdata(FdataVec &fd)
 	fd.push_back(Fdata(true, &v_string, sizeof(v_string)));
 }
 
+UTESTCASE nameSet(Utest *utest)
+{
+	Autoref<NameSet> ns1 = (new NameSet())->add("a")->add("e");
+	Autoref<NameSet> ns2 = NameSet::make()->add("b")->add("c");
+	vector<string> vv;
+	vv.push_back("a");
+	vv.push_back("e");
+	Autoref<NameSet> ns3 = new NameSet(ns1);
+	Autoref<NameSet> ns4 = new NameSet(*ns1);
+	Autoref<NameSet> ns5 = new NameSet(vv);
+	UT_ASSERT(ns1->equals(ns3));
+	UT_ASSERT(ns1->equals(ns5));
+	UT_ASSERT(!ns1->equals(ns2));
+	Autoref<NameSet> ns6 = NameSet::make(ns2)->add("x");
+	Autoref<NameSet> ns7 = NameSet::make(vv)->add("x");
+	UT_IS(ns6->size(), 3);
+}
+
 UTESTCASE emptyTable(Utest *utest)
 {
 	RowType::FieldVec fld;
@@ -58,6 +77,8 @@ UTESTCASE emptyTable(Utest *utest)
 	UT_ASSERT(tt->getErrors()->hasError());
 	UT_IS(tt->getErrors()->print(), "no indexes are defined\n");
 }
+
+// the equals() and match() on table and index types are checked in Perl
 
 UTESTCASE hashedIndex(Utest *utest)
 {
@@ -146,13 +167,13 @@ UTESTCASE badRow(Utest *utest)
 
 UTESTCASE nullRow(Utest *utest)
 {
-	Autoref<TableType> tt = (new TableType(NULL))
+	// Also test the initialize() template.
+	Autoref<TableType> tt = initialize((new TableType(NULL))
 		->addSubIndex("primary", new HashedIndexType(
 			(new NameSet())->add("a")->add("e"))
-		);
+		));
 
 	UT_ASSERT(tt);
-	tt->initialize();
 	if (UT_ASSERT(!tt->getErrors().isNull()))
 		return;
 	UT_ASSERT(tt->getErrors()->hasError());
@@ -202,6 +223,10 @@ UTESTCASE nullIndex(Utest *utest)
 
 UTESTCASE dupIndexName(Utest *utest)
 {
+	string msg;
+	Exception::abort_ = false; // make them catchable
+	Exception::enableBacktrace_ = false; // make the error messages predictable
+
 	RowType::FieldVec fld;
 	mkfields(fld);
 
@@ -221,8 +246,127 @@ UTESTCASE dupIndexName(Utest *utest)
 	tt->initialize();
 	if (UT_ASSERT(!tt->getErrors().isNull()))
 		return;
+
+	// also test checkOrThrow()
 	UT_ASSERT(tt->getErrors()->hasError());
-	UT_IS(tt->getErrors()->print(), "index error:\n  nested index 2 name 'primary' is used more than once\n");
+	try {
+		checkOrThrow(tt);
+	} catch (Exception e) {
+		msg = e.getErrors()->print();
+	}
+	UT_IS(msg, "index error:\n  nested index 2 name 'primary' is used more than once\n");
+}
+
+UTESTCASE throwOnBad(Utest *utest)
+{
+	string msg;
+	Exception::abort_ = false; // make them catchable
+	Exception::enableBacktrace_ = false; // make the error messages predictable
+
+	RowType::FieldVec fld;
+	mkfields(fld);
+	fld[1].name_ = "a"; // duplicate field name
+
+	Autoref<RowType> rt1 = new CompactRowType(fld);
+	UT_ASSERT(rt1->getErrors()->hasError());
+
+	try {
+		Autoref<TableType> tt = initializeOrThrow(TableType::make(rt1)
+			->addSubIndex("primary", new HashedIndexType(
+				(new NameSet())->add("a")->add("e"))
+			)
+		);
+	} catch (Exception e) {
+		msg = e.getErrors()->print();
+	}
+
+	UT_IS(msg, "row type error:\n  duplicate field name 'a' for fields 2 and 1\n");
+}
+
+UTESTCASE throwModInitalized(Utest *utest)
+{
+	string msg;
+	Exception::abort_ = false; // make them catchable
+	Exception::enableBacktrace_ = false; // make the error messages predictable
+
+	RowType::FieldVec fld;
+	mkfields(fld);
+
+	Autoref<RowType> rt1 = new CompactRowType(fld);
+	UT_ASSERT(!rt1->getErrors()->hasError());
+
+	Autoref<TableType> tt = TableType::make(rt1
+		)->addSubIndex("primary", HashedIndexType::make(
+				NameSet::make()->add("a")->add("e")
+			)->addSubIndex("secondary", new FifoIndexType()
+			)
+		);
+
+	tt->initialize();
+	UT_ASSERT(!tt->getErrors()->hasError());
+
+	msg.clear();
+	try {
+		tt->addSubIndex("zzz", NULL);
+	} catch (Exception e) {
+		msg = e.getErrors()->print();
+	}
+	UT_IS(msg, "Attempted to add a sub-index 'zzz' to an initialized table type\n");
+
+	HashedIndexType *primary = dynamic_cast<HashedIndexType *>(tt->findSubIndex("primary"));
+	UT_ASSERT(primary != NULL);
+
+	msg.clear();
+	try {
+		primary->addSubIndex("zzz", NULL);
+	} catch (Exception e) {
+		msg = e.getErrors()->print();
+	}
+	UT_IS(msg, "Attempted to add a sub-index 'zzz' to an initialized index type\n");
+
+	msg.clear();
+	try {
+		primary->setAggregator(NULL);
+	} catch (Exception e) {
+		msg = e.getErrors()->print();
+	}
+	UT_IS(msg, "Attempted to set an aggregator on an initialized index type\n");
+
+	msg.clear();
+	try {
+		primary->setKey(NULL);
+	} catch (Exception e) {
+		msg = e.getErrors()->print();
+	}
+	UT_IS(msg, "Attempted to set the key on an initialized Hashed index type\n");
+
+	FifoIndexType *secondary = dynamic_cast<FifoIndexType *>(primary->findSubIndex("secondary"));
+	UT_ASSERT(secondary != NULL);
+
+	msg.clear();
+	try {
+		secondary->setLimit(1);
+	} catch (Exception e) {
+		msg = e.getErrors()->print();
+	}
+	UT_IS(msg, "Attempted to set the limit value on an initialized Fifo index type\n");
+
+	msg.clear();
+	try {
+		secondary->setJumping(true);
+	} catch (Exception e) {
+		msg = e.getErrors()->print();
+	}
+	UT_IS(msg, "Attempted to set the jumping mode on an initialized Fifo index type\n");
+
+	msg.clear();
+	try {
+		secondary->setReverse(false);
+	} catch (Exception e) {
+		msg = e.getErrors()->print();
+	}
+	UT_IS(msg, "Attempted to set the reverse mode on an initialized Fifo index type\n");
+
 }
 
 UTESTCASE hashedNested(Utest *utest)
@@ -233,17 +377,16 @@ UTESTCASE hashedNested(Utest *utest)
 	Autoref<RowType> rt1 = new CompactRowType(fld);
 	UT_ASSERT(rt1->getErrors().isNull());
 
-	Autoref<TableType> tt = (new TableType(rt1))
+	Autoref<TableType> tt = initializeOrThrow(TableType::make(rt1)
 		->addSubIndex("primary", (new HashedIndexType(
 			(new NameSet())->add("a")->add("e")))
 			->addSubIndex("level2", new HashedIndexType(
 				(new NameSet())->add("a")->add("e"))
 			)
 		)
-		;
+	);
 
 	UT_ASSERT(tt);
-	tt->initialize();
 	if (UT_ASSERT(tt->getErrors().isNull()))
 		return;
 	
@@ -757,13 +900,13 @@ UTESTCASE sortedNested(Utest *utest)
 
 void dummyAggregator(Table *table, AggregatorGadget *gadget, Index *index,
         const IndexType *parentIndexType, GroupHandle *gh, Tray *dest,
-		Aggregator::AggOp aggop, Rowop::Opcode opcode, RowHandle *rh, Tray *copyTray)
+		Aggregator::AggOp aggop, Rowop::Opcode opcode, RowHandle *rh)
 {
 }
 
 void dummyAggregator2(Table *table, AggregatorGadget *gadget, Index *index,
         const IndexType *parentIndexType, GroupHandle *gh, Tray *dest,
-		Aggregator::AggOp aggop, Rowop::Opcode opcode, RowHandle *rh, Tray *copyTray)
+		Aggregator::AggOp aggop, Rowop::Opcode opcode, RowHandle *rh)
 {
 }
 
@@ -773,7 +916,7 @@ class MyAggregator : public Aggregator
 public:
 	virtual void handle(Table *table, AggregatorGadget *gadget, Index *index,
 		const IndexType *parentIndexType, GroupHandle *gh, Tray *dest,
-		AggOp aggop, Rowop::Opcode opcode, RowHandle *rh, Tray *copyTray)
+		AggOp aggop, Rowop::Opcode opcode, RowHandle *rh)
 	{ }
 };
 
@@ -865,6 +1008,22 @@ UTESTCASE aggregator(Utest *utest)
 		UT_ASSERT(!agt1->equals(agt2));
 		UT_ASSERT(!agt1->match(agt2));
 	}
+	// NULL aggregators
+	{
+		Autoref<AggregatorType> agt2 = new MyAggregatorType("onPrimary", NULL);
+		UT_ASSERT(!agt1->equals(agt2));
+		UT_ASSERT(!agt1->match(agt2));
+		UT_ASSERT(!agt2->equals(agt1));
+		UT_ASSERT(!agt2->match(agt1));
+
+		// another one with NULL that is equal
+		Autoref<AggregatorType> agt3 = new MyAggregatorType("onPrimary", NULL);
+		UT_ASSERT(agt2->equals(agt3));
+		UT_ASSERT(agt2->match(agt3));
+
+		string s = agt3->print();
+		UT_IS(s, "aggregator (\n) onPrimary");
+	}
 
 	// check the comparisons of types with aggregators
 	Autoref<IndexType> it1 = HashedIndexType::make(
@@ -916,6 +1075,22 @@ UTESTCASE aggregator(Utest *utest)
 	tt->initialize();
 	if (UT_ASSERT(tt->getErrors().isNull()))
 		return;
+
+	
+	// catch a NULL row type in aggregator
+	{
+		Autoref<TableType> ttbad = (new TableType(rt1))
+			->addSubIndex("primary", (new HashedIndexType(
+				(new NameSet())->add("a")->add("e")))
+				->setAggregator(new MyAggregatorType("onPrimary", NULL))
+			)
+			;
+		UT_ASSERT(ttbad);
+		ttbad->initialize();
+		UT_ASSERT(ttbad->getErrors()->hasError());
+		string s = ttbad->getErrors()->print();
+		UT_IS(s, "index error:\n  nested index 1 'primary':\n    aggregator 'onPrimary' internal error: the result row type is not initialized\n");
+	}
 	
 	IndexType *prim = tt->findSubIndex("primary");
 	UT_ASSERT(prim != NULL);

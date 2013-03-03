@@ -37,6 +37,7 @@ public:
 		TT_TABLE, // data store of rows (AKA "window")
 		TT_INDEX, // a table contains one or more indexes for its rows
 		TT_AGGREGATOR, // user piece of code that does aggregation on the indexes
+		TT_ROWSET, // an ordered set of rows
 		// add the new types here
 		TT_LAST_MARKER // for range checks, goes after all the real types
 	};
@@ -68,9 +69,11 @@ public:
 	// @return - the type reference (one of r_*) or NULL if not found
 	static Onceref<const SimpleType> findSimpleType(const char *name);
 
-	// Get the errors collected when parsing this type
+	// Get the errors collected when parsing this type.
+	// The checkOrThrow() from common/Initialize.h can be used to throw on errors.
 	// @return - errors reference, may be NULL
 	virtual Erref getErrors() const = 0;
+
 
 	// The types can be equal in one of 3 ways, in order or decreasting exactness:
 	// 1. Exactly the same Type object.

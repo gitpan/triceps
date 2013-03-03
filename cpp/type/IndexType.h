@@ -153,7 +153,8 @@ public:
 
 	// Add a nested index under this one.
 	//
-	// May be used only until initialized.
+	// May be used only until initialized. Afterwards will throw an Exception.
+	//
 	// The nested index remembered is actually a copy of original, so all the settings
 	// need to be done before calling here. This also means that to access indexes
 	// in a table, their types need to be obtained from TableType after it is initialized,
@@ -180,7 +181,7 @@ public:
 	// Potentially there is no reason to limit to only one aggregator
 	// but for now it's simpler this way.
 	//
-	// May be used only until initialized.
+	// May be used only until initialized. Afterwards will throw an Exception.
 	//
 	// @param agg - type of the aggregator, will be copied
 	// @return - this
@@ -197,12 +198,6 @@ public:
 	// matter whther it was made from an initialized one or not.
 	// The subclasses must define the actual copying.
 	virtual IndexType *copy() const = 0;
-
-	// Make a new instance of the index.
-	// @param tabtype - table type where this index belongs
-	// @param table - the actuall table instance where this index belongs
-	// @return - the new instance, or NULL if not initialized or had an error.
-	virtual Index *makeIndex(const TableType *tabtype, Table *table) const = 0;
 
 	// @return - true if there are no nested indexes
 	bool isLeaf() const
@@ -457,6 +452,12 @@ protected:
 public:
 	// this should become protected when the call wrappers get added to Index
 	
+	// Make a new instance of the index.
+	// @param tabtype - table type where this index belongs
+	// @param table - the actuall table instance where this index belongs
+	// @return - the new instance, or NULL if not initialized or had an error.
+	virtual Index *makeIndex(const TableType *tabtype, Table *table) const = 0;
+
 	// GroupHandle operations. Used to control the nested indexes.
 	// These operations bring together two parts: this class provides the
 	// logic while the group handle provides the set of index instances to
@@ -551,8 +552,7 @@ public:
 	// @param rows - set of rows that will be modified (with in them iterators populated)
 	// @param already - set of rows for which this notification has already been done,
 	//        indicates the groups that don't need another notification.
-	// @param copyTray - tray for the aggregator gadget(s) to deposit a row copy
-	void groupAggregateBefore(Tray *dest, Table *table, GroupHandle *gh, const RhSet &rows, const RhSet &already, Tray *copyTray) const;
+	void groupAggregateBefore(Tray *dest, Table *table, GroupHandle *gh, const RhSet &rows, const RhSet &already) const;
 
 	// Call aggregator AO_AFTER_DELETE or AO_AFTER_INSERT (as indicated by aggop)
 	// after the rows have been removed or inserted.
@@ -565,18 +565,16 @@ public:
 	// @param rows - set of rows that have been removed
 	// @param future - set of rows for which the aggregation notifications will
 	//        be called separtely in the future, modifies the Rowop::Opcode
-	// @param copyTray - tray for the aggregator gadget(s) to deposit a row copy
-	void groupAggregateAfter(Tray *dest, Aggregator::AggOp aggop, Table *table, GroupHandle *gh, const RhSet &rows, const RhSet &future, Tray *copyTray) const;
+	void groupAggregateAfter(Tray *dest, Aggregator::AggOp aggop, Table *table, GroupHandle *gh, const RhSet &rows, const RhSet &future) const;
 
 	// Attempt to collapse all the sub-indexes of the group
 	// (see the detailed discussion of the semantics in table/Index.h).
 	// @param dest - destination to send the delayed aggregation changes
 	// @param gh - the group instance, may NOT be NULL
 	// @param replaced - set of rows indentifying the groups that might be collapsible
-	// @param copyTray - tray for the aggregator gadget(s) to deposit a row copy
 	// @return - true if the group may be collapsed, i.e. all the sub-indexes agreed 
 	//      on collapsing and the group size is 0
-	bool groupCollapse(Tray *dest, GroupHandle *gh, const RhSet &replaced, Tray *copyTray) const;
+	bool groupCollapse(Tray *dest, GroupHandle *gh, const RhSet &replaced) const;
 
 	// Get the number of rows in the group.
 	// @param gh - the group instance, may be NULL
@@ -590,7 +588,7 @@ public:
 	// @param dest - destination to send the delayed aggregation changes
 	// @param table - table where the group belongs
 	// @param gh - the group instance
-	void aggregateCollapse(Tray *dest, Table *table, GroupHandle *gh, Tray *copyTray) const;
+	void aggregateCollapse(Tray *dest, Table *table, GroupHandle *gh) const;
 	// }
 protected:
 

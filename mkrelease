@@ -62,7 +62,7 @@ diff perl/Triceps/MANIFEST.sorted perl/Triceps/MANIFEST.proto || {
 
 echo
 echo "Building the documentation..."
-rm -rf "$DIR/doc/blog" || exit 1
+rm -rf "$DIR/doc/blog" "$DIR/doc/web" || exit 1
 # This is my directory with docbook tools, to avoid downnloading them into the release.
 export TRICEPS_TOOLS_BASE=$HOME/arch/docbook
 if [ ! -d "$TRICEPS_TOOLS_BASE" ]; then {

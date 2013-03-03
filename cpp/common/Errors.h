@@ -42,11 +42,17 @@ public:
 
 	// A quick way to create an object with a ready error message.
 	// This always sets the error flag.
-	// @param msg - the error message
+	// @param msg - the error message (may be multi-line)
 	Errors(const char *msg);
 	Errors(const string &msg);
 
-	// XXX there should be a way to give headers to the child errors
+	// A quick way to create an object with a ready error message
+	// and a child error. Convenient for re-throwing an Exception
+	// with extra high-level information.
+	// This always sets the error flag.
+	// @param msg - the error message (may be multi-line)
+	// @param clde - errors returned by child (or NULL)
+	Errors(const string &msg, Autoref<Errors> clde);
 
 	// Append a direct error message.
 	// @param e - flag: true if error, false if warning
@@ -61,7 +67,7 @@ public:
 
 	// Add information about a child's errors.
 	// If the child had the error flag set, sets the error flag here too.
-	// @msg - message describing the child, will be added only if the
+	// @param msg - message describing the child, will be added only if the
 	//        child errors are not empty
 	// @param clde - errors returned by child (or NULL)
 	// @return - true if the child's errors were added
@@ -89,7 +95,7 @@ public:
 	// actually needed, in case if this generation is very slow.
 	// Most of the time just giving the message directly to append()
 	// should be good enough.
-	// @msg - message describing the child, will be replaced in the
+	// @param msg - message describing the child, will be replaced in the
 	//        last error record
 	void replaceMsg(const string &msg);
 
@@ -150,6 +156,23 @@ public:
 
 // the typical error indication returned by the parsing functions
 typedef Autoref<Errors> Erref;
+
+// Add information about a child's errors, ellocating an Error
+// object if needed. The Erref may initially contain a NULL,
+// and will have a new Errors added to it before any error
+// gets added to it. Or if no errors are added, Erref is left unchanged.
+//
+// It's different from Errors::append in ignoring the non-error
+// messages returned by the child.
+//
+// @param ref - reference that collects the errors, and that might
+//        get a new Errors object placed into it before adding any errors.
+// @param msg - message describing the child, will be added only if the
+//        child errors are not empty
+// @param clde - errors returned by child (or NULL)
+// @return - true if the child's errors were added
+//       (if clde had the error indication flag set)
+bool errefAppend(Erref &ref, const string &msg, Autoref<Errors> clde);
 
 }; // TRICEPS_NS
 

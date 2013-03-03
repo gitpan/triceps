@@ -39,6 +39,9 @@ public:
 
 		// the default copy and assignment are good enough
 		
+		// XXX add constructor and assign() from the type name, including
+		// the array type recognition like in RowType.xs
+		
 		Field(const string &name, Autoref<const Type> t, int arsz = -1) :
 			name_(name),
 			type_(t),
@@ -102,7 +105,7 @@ public:
 
 	// {
 	// Operations on a row of this format.
-	// Since they take prow ointers, the row must be held in some
+	// Since they take row pointers, the row must be held in some
 	// other Autoptr to avoid it being destroyed.
 
 	// Check whether a field is NULL
@@ -114,7 +117,7 @@ public:
 	// @param row - row to operate on
 	// @param nf - field number, starting from 0
 	// @param ptr - returned pointer to field data
-	// @param len - returned field data length
+	// @param len - returned field data length; for a NULL field will be 0
 	// @return - true if field is NOT null
 	virtual bool getField(const Row *row, int nf, const char *&ptr, intptr_t &len) const = 0;
 
@@ -345,6 +348,27 @@ public:
 		return (row_ != ar.row_);
 	}
 
+	uint8_t getUint8(int nf, int pos = 0) const
+	{
+		return type_->getUint8(row_, nf, pos);
+	}
+	int32_t getInt32(int nf, int pos = 0) const
+	{
+		return type_->getInt32(row_, nf, pos);
+	}
+	int64_t getInt64(int nf, int pos = 0) const
+	{
+		return type_->getInt64(row_, nf, pos);
+	}
+	double getFloat64(int nf, int pos = 0) const
+	{
+		return type_->getFloat64(row_, nf, pos);
+	}
+	const char *getString(int nf) const
+	{
+		return type_->getString(row_, nf);
+	}
+
 protected:
 	// Drop the current reference
 	inline void drop()
@@ -374,7 +398,8 @@ protected:
 class Fdata 
 {
 public:
-	Fdata()
+	Fdata() :
+		notNull_(false)
 	{ }
 
 	// set the field to null

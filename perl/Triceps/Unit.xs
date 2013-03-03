@@ -13,6 +13,7 @@
 
 #include "TricepsPerl.h"
 #include "PerlCallback.h"
+#include "sched/FnReturn.h"
 
 MODULE = Triceps::Unit		PACKAGE = Triceps::Unit
 ###################################################################################
@@ -172,6 +173,72 @@ empty(WrapUnit *self)
 	OUTPUT:
 		RETVAL
 
+# Work with the streaming functions: call one or more rowops
+# in a scope of pushed function bindings. Same thing as push the
+# bindings, do the calls, pop the bindings.
+#
+# $unit->callBound( # pushes all the bindings, does the call, pops
+#     $rowop, # or $tray, or [ @rowops ]
+#     $fnr => $bind, ...
+# );
+#
+# Always returns 1, unless it confesses on errors.
+int
+callBound(WrapUnit *self, SV *ops, ...)
+	CODE:
+		try {
+			static char funcName[] =  "Triceps::Unit::callBound";
+			clearErrMsg();
+			Unit *u = self->get();
+			Autoref<AutoFnBind> ab = new AutoFnBind;
+
+			// first push the bindings
+			if (items % 2 != 0) {
+				throw Exception::f("Usage: %s(self, ops, fnret1 => fnbinding1, ...), returns and bindings must go in pairs", funcName);
+			}
+
+			// first push the bindings
+			for (int i = 2; i < items; i += 2) {
+				FnReturn *ret = TRICEPS_GET_WRAP(FnReturn, ST(i), "%s: argument %d", funcName, i)->get();
+				FnBinding *bind = TRICEPS_GET_WRAP(FnBinding, ST(i+1), "%s: argument %d", funcName, i+1)->get();
+				try {
+					ab->add(ret, bind);
+				} catch(Exception e) {
+					throw Exception::f(e, "%s: arguments %d, %d:", funcName, i, i+1);
+				}
+			}
+
+			// now find out what rowops the process
+			if (SvROK(ops) && (SvTYPE(SvRV(ops)) == SVt_PVAV)) {
+				// an array of rowops
+				AV *arops = (AV*)SvRV(ops);
+				int len = av_len(arops)+1; // av_len returns the index of last element
+				for (int i = 0; i < len; i++) {
+					SV *svop = *av_fetch(arops, i, 0);
+					u->call(TRICEPS_GET_WRAP(Rowop, svop, "%s: element %d of the rowop array", funcName, i)->get()); // not i+1 by design
+				}
+			} else {
+				WrapRowop *wrop;
+				WrapTray *wtray;
+				TRICEPS_GET_WRAP2(Rowop, wrop, Tray, wtray, ops, "%s: ops argument", funcName);
+				if (wrop) {
+					u->call(wrop->get());
+				} else {
+					u->callTray(wtray->get());
+				}
+			}
+
+			// the bindings get popped
+			try {
+				ab->clear();
+			} catch(Exception e) {
+				throw Exception::f(e, "%s: error on popping the bindings:", funcName);
+			}
+		} TRICEPS_CATCH_CROAK;
+		RETVAL = 1;
+	OUTPUT:
+		RETVAL
+
 # check whether both refs point to the same object
 int
 same(WrapUnit *self, WrapUnit *other)
@@ -206,6 +273,38 @@ getStackDepth(WrapUnit *self)
 		clearErrMsg();
 		Unit *u = self->get();
 		RETVAL = u->getStackDepth();
+	OUTPUT:
+		RETVAL
+
+void
+setMaxStackDepth(WrapUnit *self, int v)
+	CODE:
+		clearErrMsg();
+		Unit *u = self->get();
+		u->setMaxStackDepth(v);
+
+int
+maxStackDepth(WrapUnit *self)
+	CODE:
+		clearErrMsg();
+		Unit *u = self->get();
+		RETVAL = u->maxStackDepth();
+	OUTPUT:
+		RETVAL
+
+void
+setMaxRecursionDepth(WrapUnit *self, int v)
+	CODE:
+		clearErrMsg();
+		Unit *u = self->get();
+		u->setMaxRecursionDepth(v);
+
+int
+maxRecursionDepth(WrapUnit *self)
+	CODE:
+		clearErrMsg();
+		Unit *u = self->get();
+		RETVAL = u->maxRecursionDepth();
 	OUTPUT:
 		RETVAL
 

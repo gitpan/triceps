@@ -15,7 +15,7 @@
 use ExtUtils::testlib;
 
 use Test;
-BEGIN { plan tests => 143 };
+BEGIN { plan tests => 151 };
 use Triceps;
 ok(1); # If we made it this far, we're ok.
 
@@ -381,15 +381,16 @@ ok(ref $recrop, "Triceps::Rowop");
 eval {
 	$u1->call($recrop);
 };
-ok($@ =~ /^Detected a recursive call of the label 'reclab'. at [^\n]*
+ok($@ =~ /^Exceeded the unit recursion depth limit 1 \(attempted 2\) on the label 'reclab'. at [^\n]*
 \tmain::__ANON__[^\n]*
 \teval[^\n]*
 Detected in the unit 'u1' label 'reclab' execution handler.
 Called through the label 'reclab'. at [^\n]*
 \teval[^\n]*
 /);
+#print "$@";
 
-# a crash in a deeply nexted label
+# a crash in a deeply nested label
 $nlab1 = $u1->makeLabel($rt1, "nlab1", undef, sub { die "Test of a crash"; } );
 ok(ref $nlab1, "Triceps::Label");
 $nlab2 = $u1->makeLabel($rt1, "nlab2", undef, sub { $u1->call($nlab1->adopt($_[1])); } );
@@ -427,6 +428,61 @@ Detected in the unit 'u1' label 'nlab5' execution handler.
 Called through the label 'nlab5'. at [^\n]*
 	eval [^\n]*
 /);
+
+#############################################################
+# Test the call depth limits.
+
+ok($u1->maxStackDepth(), 0);
+ok($u1->maxRecursionDepth(), 1);
+
+$u1->setMaxRecursionDepth(3);
+ok($u1->maxRecursionDepth(), 3);
+
+eval {
+	$u1->call($recrop);
+};
+ok($@ =~ /^Exceeded the unit recursion depth limit 3 \(attempted 4\) on the label 'reclab'. at [^\n]*
+\tmain::__ANON__[^\n]*
+\teval[^\n]*
+Detected in the unit 'u1' label 'reclab' execution handler.
+Called through the label 'reclab'. at [^\n]*
+\tmain::__ANON__[^\n]*
+\teval[^\n]*
+Detected in the unit 'u1' label 'reclab' execution handler.
+Called through the label 'reclab'. at [^\n]*
+\tmain::__ANON__[^\n]*
+\teval[^\n]*
+Detected in the unit 'u1' label 'reclab' execution handler.
+Called through the label 'reclab'. at [^\n]*
+\teval[^\n]*
+/);
+#print "$@";
+
+$u1->setMaxStackDepth(3);
+$u1->setMaxRecursionDepth(0);
+ok($u1->maxStackDepth(), 3);
+ok($u1->maxRecursionDepth(), 0);
+
+eval {
+	$u1->call($recrop);
+};
+# There is always also the outermost frame, so the label recurses one less time.
+ok($@ =~ /^Unit 'u1' exceeded the stack depth limit 3, current depth 4, when calling the label 'reclab'. at [^\n]*
+\tmain::__ANON__[^\n]*
+\teval[^\n]*
+Detected in the unit 'u1' label 'reclab' execution handler.
+Called through the label 'reclab'. at [^\n]*
+\tmain::__ANON__[^\n]*
+\teval[^\n]*
+Detected in the unit 'u1' label 'reclab' execution handler.
+Called through the label 'reclab'. at [^\n]*
+\teval[^\n]*
+/);
+#print "$@";
+
+# restore back to defaults
+$u1->setMaxStackDepth(0);
+$u1->setMaxRecursionDepth(1);
 
 #############################################################
 # tracer ops
@@ -515,8 +571,15 @@ $u1->setTracer($sntr);
 
 $s_lab1 = $u1->makeDummyLabel($rt1, "lab1");
 ok(ref $s_lab1, "Triceps::Label");
-$s_lab2 = $u1->makeDummyLabel($rt1, "lab2");
+
+# This is a test of how the nested forking goes.
+$s_lab2a = $u1->makeDummyLabel($rt1, "lab2a");
+ok(ref $s_lab2a, "Triceps::Label");
+$s_lab2 = $u1->makeLabel($rt1, "lab2", undef, sub {
+	$u1->fork($s_lab2a->adopt($_[1]));
+});
 ok(ref $s_lab2, "Triceps::Label");
+
 $s_lab3 = $u1->makeDummyLabel($rt1, "lab3");
 ok(ref $s_lab3, "Triceps::Label");
 
@@ -536,12 +599,16 @@ $s_expect =
 	. "unit 'u1' before label 'lab3' op OP_DELETE\n"
 	. "unit 'u1' before label 'lab2' op OP_INSERT\n"
 	. "unit 'u1' before label 'lab2' op OP_DELETE\n"
+	. "unit 'u1' before label 'lab2a' op OP_INSERT\n"
+	. "unit 'u1' before label 'lab2a' op OP_DELETE\n"
 
 	. "unit 'u1' before label 'lab5' op OP_NOP\n"
 	. "unit 'u1' before label 'lab3' op OP_INSERT\n"
 	. "unit 'u1' before label 'lab3' op OP_DELETE\n"
 	. "unit 'u1' before label 'lab2' op OP_INSERT\n"
 	. "unit 'u1' before label 'lab2' op OP_DELETE\n"
+	. "unit 'u1' before label 'lab2a' op OP_INSERT\n"
+	. "unit 'u1' before label 'lab2a' op OP_DELETE\n"
 
 	. "unit 'u1' before label 'lab1' op OP_INSERT\n"
 	. "unit 'u1' before label 'lab1' op OP_DELETE\n"
@@ -552,45 +619,47 @@ $s_expect =
 $s_expect_verbose =
 	"unit 'u1' before label 'lab4' op OP_NOP {\n"
 	. "unit 'u1' before label 'lab3' op OP_INSERT {\n"
-	. "unit 'u1' drain label 'lab3' op OP_INSERT\n"
 	. "unit 'u1' after label 'lab3' op OP_INSERT }\n"
 	. "unit 'u1' before label 'lab3' op OP_DELETE {\n"
-	. "unit 'u1' drain label 'lab3' op OP_DELETE\n"
 	. "unit 'u1' after label 'lab3' op OP_DELETE }\n"
-	. "unit 'u1' drain label 'lab4' op OP_NOP\n"
+	. "unit 'u1' after label 'lab4' op OP_NOP }\n"
+
+	. "unit 'u1' before-drain label 'lab4' op OP_NOP {\n"
 	. "unit 'u1' before label 'lab2' op OP_INSERT {\n"
-	. "unit 'u1' drain label 'lab2' op OP_INSERT\n"
 	. "unit 'u1' after label 'lab2' op OP_INSERT }\n"
 	. "unit 'u1' before label 'lab2' op OP_DELETE {\n"
-	. "unit 'u1' drain label 'lab2' op OP_DELETE\n"
 	. "unit 'u1' after label 'lab2' op OP_DELETE }\n"
-	. "unit 'u1' after label 'lab4' op OP_NOP }\n"
+	. "unit 'u1' before label 'lab2a' op OP_INSERT {\n"
+	. "unit 'u1' after label 'lab2a' op OP_INSERT }\n"
+	. "unit 'u1' before label 'lab2a' op OP_DELETE {\n"
+	. "unit 'u1' after label 'lab2a' op OP_DELETE }\n"
+	. "unit 'u1' after-drain label 'lab4' op OP_NOP }\n"
+
 	. "unit 'u1' before label 'lab5' op OP_NOP {\n"
 	. "unit 'u1' before label 'lab3' op OP_INSERT {\n"
-	. "unit 'u1' drain label 'lab3' op OP_INSERT\n"
 	. "unit 'u1' after label 'lab3' op OP_INSERT }\n"
 	. "unit 'u1' before label 'lab3' op OP_DELETE {\n"
-	. "unit 'u1' drain label 'lab3' op OP_DELETE\n"
 	. "unit 'u1' after label 'lab3' op OP_DELETE }\n"
-	. "unit 'u1' drain label 'lab5' op OP_NOP\n"
+	. "unit 'u1' after label 'lab5' op OP_NOP }\n"
+
+	. "unit 'u1' before-drain label 'lab5' op OP_NOP {\n"
 	. "unit 'u1' before label 'lab2' op OP_INSERT {\n"
-	. "unit 'u1' drain label 'lab2' op OP_INSERT\n"
 	. "unit 'u1' after label 'lab2' op OP_INSERT }\n"
 	. "unit 'u1' before label 'lab2' op OP_DELETE {\n"
-	. "unit 'u1' drain label 'lab2' op OP_DELETE\n"
 	. "unit 'u1' after label 'lab2' op OP_DELETE }\n"
-	. "unit 'u1' after label 'lab5' op OP_NOP }\n"
+	. "unit 'u1' before label 'lab2a' op OP_INSERT {\n"
+	. "unit 'u1' after label 'lab2a' op OP_INSERT }\n"
+	. "unit 'u1' before label 'lab2a' op OP_DELETE {\n"
+	. "unit 'u1' after label 'lab2a' op OP_DELETE }\n"
+	. "unit 'u1' after-drain label 'lab5' op OP_NOP }\n"
+
 	. "unit 'u1' before label 'lab1' op OP_INSERT {\n"
-	. "unit 'u1' drain label 'lab1' op OP_INSERT\n"
 	. "unit 'u1' after label 'lab1' op OP_INSERT }\n"
 	. "unit 'u1' before label 'lab1' op OP_DELETE {\n"
-	. "unit 'u1' drain label 'lab1' op OP_DELETE\n"
 	. "unit 'u1' after label 'lab1' op OP_DELETE }\n"
 	. "unit 'u1' before label 'lab1' op OP_INSERT {\n"
-	. "unit 'u1' drain label 'lab1' op OP_INSERT\n"
 	. "unit 'u1' after label 'lab1' op OP_INSERT }\n"
 	. "unit 'u1' before label 'lab1' op OP_DELETE {\n"
-	. "unit 'u1' drain label 'lab1' op OP_DELETE\n"
 	. "unit 'u1' after label 'lab1' op OP_DELETE }\n"
 	;
 
@@ -642,9 +711,9 @@ sub tracerCb() # unit, label, fromLabel, rop, when, extra
 		$msg .= "(chain '" . $fromLabel->getName() . "') ";
 	}
 	$msg .= "op " . Triceps::opcodeString($rop->getOpcode());
-	if ($when == &Triceps::TW_BEFORE) {
+	if (Triceps::tracerWhenIsBefore($when)) {
 		$msg .= " {";
-	} elsif ($when == &Triceps::TW_AFTER) {
+	} elsif (Triceps::tracerWhenIsAfter($when)) {
 		$msg .= " }";
 	}
 	$msg .= "\n";
@@ -698,35 +767,31 @@ ok($u1->empty());
 
 $c_expect =
 	"unit 'u1' before label 'lab1' op OP_INSERT {\n"
-	. "unit 'u1' drain label 'lab1' op OP_INSERT\n"
-	. "unit 'u1' before-chained label 'lab1' op OP_INSERT\n"
+	. "unit 'u1' before-chained label 'lab1' op OP_INSERT {\n"
 		. "unit 'u1' before label 'lab2' (chain 'lab1') op OP_INSERT {\n"
-		. "unit 'u1' drain label 'lab2' (chain 'lab1') op OP_INSERT\n"
-		. "unit 'u1' before-chained label 'lab2' (chain 'lab1') op OP_INSERT\n"
+		. "unit 'u1' before-chained label 'lab2' (chain 'lab1') op OP_INSERT {\n"
 			. "unit 'u1' before label 'lab3' (chain 'lab2') op OP_INSERT {\n"
-			. "unit 'u1' drain label 'lab3' (chain 'lab2') op OP_INSERT\n"
 			. "unit 'u1' after label 'lab3' (chain 'lab2') op OP_INSERT }\n"
+		. "unit 'u1' after-chained label 'lab2' (chain 'lab1') op OP_INSERT }\n"
 		. "unit 'u1' after label 'lab2' (chain 'lab1') op OP_INSERT }\n"
 
 		. "unit 'u1' before label 'lab3' (chain 'lab1') op OP_INSERT {\n"
-		. "unit 'u1' drain label 'lab3' (chain 'lab1') op OP_INSERT\n"
 		. "unit 'u1' after label 'lab3' (chain 'lab1') op OP_INSERT }\n"
+	. "unit 'u1' after-chained label 'lab1' op OP_INSERT }\n"
 	. "unit 'u1' after label 'lab1' op OP_INSERT }\n"
 
 	. "unit 'u1' before label 'lab1' op OP_DELETE {\n"
-	. "unit 'u1' drain label 'lab1' op OP_DELETE\n"
-	. "unit 'u1' before-chained label 'lab1' op OP_DELETE\n"
+	. "unit 'u1' before-chained label 'lab1' op OP_DELETE {\n"
 		. "unit 'u1' before label 'lab2' (chain 'lab1') op OP_DELETE {\n"
-		. "unit 'u1' drain label 'lab2' (chain 'lab1') op OP_DELETE\n"
-		. "unit 'u1' before-chained label 'lab2' (chain 'lab1') op OP_DELETE\n"
+		. "unit 'u1' before-chained label 'lab2' (chain 'lab1') op OP_DELETE {\n"
 			. "unit 'u1' before label 'lab3' (chain 'lab2') op OP_DELETE {\n"
-			. "unit 'u1' drain label 'lab3' (chain 'lab2') op OP_DELETE\n"
 			. "unit 'u1' after label 'lab3' (chain 'lab2') op OP_DELETE }\n"
+		. "unit 'u1' after-chained label 'lab2' (chain 'lab1') op OP_DELETE }\n"
 		. "unit 'u1' after label 'lab2' (chain 'lab1') op OP_DELETE }\n"
 
 		. "unit 'u1' before label 'lab3' (chain 'lab1') op OP_DELETE {\n"
-		. "unit 'u1' drain label 'lab3' (chain 'lab1') op OP_DELETE\n"
 		. "unit 'u1' after label 'lab3' (chain 'lab1') op OP_DELETE }\n"
+	. "unit 'u1' after-chained label 'lab1' op OP_DELETE }\n"
 	. "unit 'u1' after label 'lab1' op OP_DELETE }\n"
 	;
 
@@ -742,12 +807,10 @@ sub traceStringRowop
 		$verbose, $rlog, $rnest) = @_;
 
 	if ($verbose) {
-		${$rnest}++ if ($when == &Triceps::TW_BEFORE);
-		${$rnest}-- if ($when == &Triceps::TW_AFTER);
+		${$rnest}-- if (Triceps::tracerWhenIsAfter($when));
 	} else {
 		return if ($when != &Triceps::TW_BEFORE);
 	}
-
 
 	my $msg =  "unit '" . $unit->getName() . "' " 
 		. Triceps::tracerWhenHumanString($when) . " label '"
@@ -756,22 +819,21 @@ sub traceStringRowop
 		$msg .= "(chain '" . $fromLabel->getName() . "') ";
 	}
 	my $tail = "";
-	if ($when == &Triceps::TW_BEFORE) {
+	if (Triceps::tracerWhenIsBefore($when)) {
 		$tail = " {";
-	} elsif ($when == &Triceps::TW_AFTER) {
+	} elsif (Triceps::tracerWhenIsAfter($when)) {
 		$tail = " }";
 	}
 	push (@{$rlog}, ("  " x ${$rnest}) . $msg . "op " 
 		. $rowop->printP() . $tail);
 
 	if ($verbose) {
-		${$rnest}++ if ($when == &Triceps::TW_BEFORE);
-		${$rnest}-- if ($when == &Triceps::TW_AFTER);
+		${$rnest}++ if (Triceps::tracerWhenIsBefore($when));
 	}
 }
 
 undef @history;
-my $tnest =  -1; # keeps track of the tracing nesting level
+my $tnest =  0; # keeps track of the tracing nesting level
 $ptr = Triceps::UnitTracerPerl->new(\&traceStringRowop, 1, \@history, \$tnest);
 $u1->setTracer($ptr);
 
@@ -784,38 +846,34 @@ ok($u1->empty());
 
 $c_expect_rows = ""
 	. "unit 'u1' before label 'lab1' op lab1 OP_INSERT a=\"123\" b=\"456\" c=\"789\" d=\"3.14\" e=\"text\"  {\n"
-	. "  unit 'u1' drain label 'lab1' op lab1 OP_INSERT a=\"123\" b=\"456\" c=\"789\" d=\"3.14\" e=\"text\" \n"
-	. "  unit 'u1' before-chained label 'lab1' op lab1 OP_INSERT a=\"123\" b=\"456\" c=\"789\" d=\"3.14\" e=\"text\" \n"
+	. "  unit 'u1' before-chained label 'lab1' op lab1 OP_INSERT a=\"123\" b=\"456\" c=\"789\" d=\"3.14\" e=\"text\"  {\n"
 	. "    unit 'u1' before label 'lab2' (chain 'lab1') op lab1 OP_INSERT a=\"123\" b=\"456\" c=\"789\" d=\"3.14\" e=\"text\"  {\n"
-	. "      unit 'u1' drain label 'lab2' (chain 'lab1') op lab1 OP_INSERT a=\"123\" b=\"456\" c=\"789\" d=\"3.14\" e=\"text\" \n"
-	. "      unit 'u1' before-chained label 'lab2' (chain 'lab1') op lab1 OP_INSERT a=\"123\" b=\"456\" c=\"789\" d=\"3.14\" e=\"text\" \n"
+	. "      unit 'u1' before-chained label 'lab2' (chain 'lab1') op lab1 OP_INSERT a=\"123\" b=\"456\" c=\"789\" d=\"3.14\" e=\"text\"  {\n"
 	. "        unit 'u1' before label 'lab3' (chain 'lab2') op lab1 OP_INSERT a=\"123\" b=\"456\" c=\"789\" d=\"3.14\" e=\"text\"  {\n"
-	. "          unit 'u1' drain label 'lab3' (chain 'lab2') op lab1 OP_INSERT a=\"123\" b=\"456\" c=\"789\" d=\"3.14\" e=\"text\" \n"
 	. "        unit 'u1' after label 'lab3' (chain 'lab2') op lab1 OP_INSERT a=\"123\" b=\"456\" c=\"789\" d=\"3.14\" e=\"text\"  }\n"
+	. "      unit 'u1' after-chained label 'lab2' (chain 'lab1') op lab1 OP_INSERT a=\"123\" b=\"456\" c=\"789\" d=\"3.14\" e=\"text\"  }\n"
 	. "    unit 'u1' after label 'lab2' (chain 'lab1') op lab1 OP_INSERT a=\"123\" b=\"456\" c=\"789\" d=\"3.14\" e=\"text\"  }\n"
 	. "    unit 'u1' before label 'lab3' (chain 'lab1') op lab1 OP_INSERT a=\"123\" b=\"456\" c=\"789\" d=\"3.14\" e=\"text\"  {\n"
-	. "      unit 'u1' drain label 'lab3' (chain 'lab1') op lab1 OP_INSERT a=\"123\" b=\"456\" c=\"789\" d=\"3.14\" e=\"text\" \n"
 	. "    unit 'u1' after label 'lab3' (chain 'lab1') op lab1 OP_INSERT a=\"123\" b=\"456\" c=\"789\" d=\"3.14\" e=\"text\"  }\n"
+	. "  unit 'u1' after-chained label 'lab1' op lab1 OP_INSERT a=\"123\" b=\"456\" c=\"789\" d=\"3.14\" e=\"text\"  }\n"
 	. "unit 'u1' after label 'lab1' op lab1 OP_INSERT a=\"123\" b=\"456\" c=\"789\" d=\"3.14\" e=\"text\"  }\n"
 	. "unit 'u1' before label 'lab1' op lab1 OP_DELETE a=\"123\" b=\"456\" c=\"789\" d=\"3.14\" e=\"text\"  {\n"
-	. "  unit 'u1' drain label 'lab1' op lab1 OP_DELETE a=\"123\" b=\"456\" c=\"789\" d=\"3.14\" e=\"text\" \n"
-	. "  unit 'u1' before-chained label 'lab1' op lab1 OP_DELETE a=\"123\" b=\"456\" c=\"789\" d=\"3.14\" e=\"text\" \n"
+	. "  unit 'u1' before-chained label 'lab1' op lab1 OP_DELETE a=\"123\" b=\"456\" c=\"789\" d=\"3.14\" e=\"text\"  {\n"
 	. "    unit 'u1' before label 'lab2' (chain 'lab1') op lab1 OP_DELETE a=\"123\" b=\"456\" c=\"789\" d=\"3.14\" e=\"text\"  {\n"
-	. "      unit 'u1' drain label 'lab2' (chain 'lab1') op lab1 OP_DELETE a=\"123\" b=\"456\" c=\"789\" d=\"3.14\" e=\"text\" \n"
-	. "      unit 'u1' before-chained label 'lab2' (chain 'lab1') op lab1 OP_DELETE a=\"123\" b=\"456\" c=\"789\" d=\"3.14\" e=\"text\" \n"
+	. "      unit 'u1' before-chained label 'lab2' (chain 'lab1') op lab1 OP_DELETE a=\"123\" b=\"456\" c=\"789\" d=\"3.14\" e=\"text\"  {\n"
 	. "        unit 'u1' before label 'lab3' (chain 'lab2') op lab1 OP_DELETE a=\"123\" b=\"456\" c=\"789\" d=\"3.14\" e=\"text\"  {\n"
-	. "          unit 'u1' drain label 'lab3' (chain 'lab2') op lab1 OP_DELETE a=\"123\" b=\"456\" c=\"789\" d=\"3.14\" e=\"text\" \n"
 	. "        unit 'u1' after label 'lab3' (chain 'lab2') op lab1 OP_DELETE a=\"123\" b=\"456\" c=\"789\" d=\"3.14\" e=\"text\"  }\n"
+	. "      unit 'u1' after-chained label 'lab2' (chain 'lab1') op lab1 OP_DELETE a=\"123\" b=\"456\" c=\"789\" d=\"3.14\" e=\"text\"  }\n"
 	. "    unit 'u1' after label 'lab2' (chain 'lab1') op lab1 OP_DELETE a=\"123\" b=\"456\" c=\"789\" d=\"3.14\" e=\"text\"  }\n"
 	. "    unit 'u1' before label 'lab3' (chain 'lab1') op lab1 OP_DELETE a=\"123\" b=\"456\" c=\"789\" d=\"3.14\" e=\"text\"  {\n"
-	. "      unit 'u1' drain label 'lab3' (chain 'lab1') op lab1 OP_DELETE a=\"123\" b=\"456\" c=\"789\" d=\"3.14\" e=\"text\" \n"
 	. "    unit 'u1' after label 'lab3' (chain 'lab1') op lab1 OP_DELETE a=\"123\" b=\"456\" c=\"789\" d=\"3.14\" e=\"text\"  }\n"
+	. "  unit 'u1' after-chained label 'lab1' op lab1 OP_DELETE a=\"123\" b=\"456\" c=\"789\" d=\"3.14\" e=\"text\"  }\n"
 	. "unit 'u1' after label 'lab1' op lab1 OP_DELETE a=\"123\" b=\"456\" c=\"789\" d=\"3.14\" e=\"text\"  }"
 	;
 
 
 ok(join("\n", @history), $c_expect_rows);
-# print join("\n", @history), "\n";
+#print join("\n", @history), "\n";
 
 {
 	my @res;
@@ -840,6 +898,9 @@ ok(join("\n", @history), $c_expect_rows);
 #############################################################
 # frame marks are tested in FrameMark.t, as well as makeLoopHead()
 # and makeLoopAround()
+
+#############################################################
+# callBound() is tested in Fn.t
 
 #############################################################
 # MUST BE LAST

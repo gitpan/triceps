@@ -44,6 +44,11 @@ UTESTCASE simple(Utest *utest)
 	UT_ASSERT(!e4->isEmpty());
 	UT_ASSERT(e4->hasError());
 	UT_IS(e4->print(), "msg5\nmsg6\n");
+
+	Erref e5 = new Errors(string("msg7\nmsg8"), e4);
+	UT_ASSERT(!e5->isEmpty());
+	UT_ASSERT(e5->hasError());
+	UT_IS(e5->print(), "msg7\nmsg8\n  msg5\n  msg6\n");
 }
 
 UTESTCASE nested(Utest *utest)
@@ -133,3 +138,35 @@ UTESTCASE absorb(Utest *utest)
 	UT_ASSERT(e2->hasError());
 	UT_IS(e2->elist_.size(), 2);
 }
+
+UTESTCASE errefAppend(Utest *utest)
+{
+	Erref e1;
+	UT_ASSERT(e1.isNull());
+
+	UT_IS(errefAppend(e1, "msg1", new Errors("zzz")), true);
+	UT_ASSERT(!e1.isNull());
+	UT_IS(e1->print(), "msg1\n  zzz\n");
+
+	UT_IS(errefAppend(e1, "msg2", new Errors("xxx")), true);
+	UT_IS(e1->print(), "msg1\n  zzz\nmsg2\n  xxx\n");
+
+	UT_IS(errefAppend(e1, "msg3", new Errors(false)), false);
+	UT_IS(e1->print(), "msg1\n  zzz\nmsg2\n  xxx\n");
+
+	Erref e2 = new Errors();
+	e2->appendMsg(false, "yyy");
+	UT_IS(errefAppend(e1, "msg4", e2), false);
+	UT_IS(e1->print(), "msg1\n  zzz\nmsg2\n  xxx\n");
+
+	UT_IS(errefAppend(e1, "msg5", NULL), false);
+	UT_IS(e1->print(), "msg1\n  zzz\nmsg2\n  xxx\n");
+
+	Erref e3;
+	UT_ASSERT(e3.isNull());
+	UT_IS(errefAppend(e3, "msg4", e2), false);
+	UT_ASSERT(e3.isNull());
+	UT_IS(errefAppend(e3, "msg5", NULL), false);
+	UT_ASSERT(e3.isNull());
+}
+

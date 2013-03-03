@@ -12,6 +12,7 @@
 #include <type/TableType.h>
 #include <table/RootIndex.h>
 #include <sched/AggregatorGadget.h>
+#include <sched/FnReturn.h>
 
 namespace TRICEPS_NS {
 
@@ -44,7 +45,6 @@ public:
 	// Return the label for sending Rowops into the table
 	// (as opposed to getLabel() which is inherited from gadget and
 	// returns the output label, on which the rowops are sent from the table).
-	// May return NULL if the input label was not created.
 	Label *getInputLabel() const
 	{
 		return inputLabel_.get();
@@ -52,10 +52,18 @@ public:
 
 	// Return the label that gets called (always called, no other modes)
 	// if it has anything else chained on it before modifying each row.
-	// May return NULL if the input label was not created.
 	Label *getPreLabel() const
 	{
 		return preLabel_.get();
+	}
+
+	// Return the label that gets called by the dump methods.
+	// This is a way to iterate with the streaming functions: connect your
+	// binding to the dump label, and then call one of the dump methods
+	// to send a set of rows to it.
+	Label *getDumpLabel() const
+	{
+		return dumpLabel_.get();
 	}
 
 	// Return the label of a named aggregator
@@ -77,6 +85,17 @@ public:
 	{
 		return root_->size();
 	}
+
+	// Get the FnReturn for this table. It will get created on the first
+	// call, so if not used, it will not add overhead.
+	// Its name is "<table_name>.fret".
+	// It contains some fixed labels: "out", "pre" and "dump", and a label for every
+	// aggregator.
+	// The table keeps a reference to the FnReturn, so returning a pointer
+	// is always safe.
+	// If something goes very wrong (pretty much the only reason for it is if
+	// you name an aggregator "pre" or "out" or such), it may throw an Exception.
+	FnReturn *fnReturn() const;
 	
 	/////// operations on rows
 
@@ -88,31 +107,27 @@ public:
 	// Insert a row.
 	// May throw an Exception.
 	// @param row - the row to insert
-	// @param copyTray - a tray to put a copy of changes in the table, or NULL
 	// @return - true on success, false on failure (if the index policies don't allow it)
-	bool insertRow(const Row *row, Tray *copyTray = NULL);
+	bool insertRow(const Row *row);
 	// Insert a pre-initialized row handle.
 	// May throw an Exception.
 	// If the handle is already in table, does nothing and returns false.
 	// @param rh - the row handle to insert (must be held in a Rowref or such at the moment)
-	// @param copyTray - a tray to put a copy of changes in the table, or NULL
 	// @return - true on success, false on failure (if the index policies don't allow it)
-	bool insert(RowHandle *rh, Tray *copyTray = NULL);
+	bool insert(RowHandle *rh);
 
 	// XXX also add a version working on RhSet, for better efficiency?
 	// Remove a row handle from the table. If the row is already not in table, do nothing.
 	// May throw an Exception.
 	// @param rh - row handle to remove
-	// @param copyTray - a tray to put a copy of changes in the table, or NULL
-	void remove(RowHandle *rh, Tray *copyTray = NULL);
+	void remove(RowHandle *rh);
 
 	// Find the matching row in the table (by the default index),
 	// and if found, remove it.
 	// May throw an Exception.
 	// @param row - the row to find matching and remove
-	// @param copyTray - a tray to put a copy of changes in the table, or NULL
 	// @return - true if found and removed, false if not found
-	bool deleteRow(const Row *row, Tray *copyTray = NULL);
+	bool deleteRow(const Row *row);
 
 	// Get the handle of the first record in this table.
 	// A random index will be used for iteration. Usually this will be
@@ -220,6 +235,32 @@ public:
 	// finding the group.
 	size_t groupSizeRowIdx(IndexType *ixt, const Row *what) const;
 
+	// Clear the table. The deleted rowops will be send out of the "pre" and
+	// "out" labels as usual. The rows are sent in the order of the
+	// first leaf index.
+	// In the future it might be optimized, the initial implementation
+	// works in a simple way.
+	// May throw an Exception.
+	// @param limit - maximal number of the rows to delete. 0 means
+	//        "delete all".
+	void clear(size_t limit = 0);
+
+	// { The dump interface.
+	
+	// Send the whole contents of the table to the dump label.
+	// The first leaf index is used to determine the order of the rows sent.
+	// @param op - Opcode to use for sending (INSERT by default).
+	void dumpAll(Rowop::Opcode op = Rowop::OP_INSERT) const;
+
+	// Send the whole contents of the table to the dump label, in a specific order.
+	// @param ixt - Index type that determines the ordering of the rows.
+	//        If NULL then the default first leaf index is used.
+	//        The index type must belong to this table's type.
+	// @param op - Opcode to use for sending (INSERT by default).
+	void dumpAllIdx(IndexType *ixt, Rowop::Opcode op = Rowop::OP_INSERT) const;
+
+	// } The dump interface.
+
 protected:
 	friend class TableType;
 	// A Table is normally created by a TableType as a factory.
@@ -277,6 +318,8 @@ protected:
 	Autoref<InputLabel> inputLabel_;
 	Autoref<IndexType> firstLeaf_; // the first leaf index type, used for default find
 	Autoref<DummyLabel> preLabel_; // called before modifying a row, if has anything chained
+	Autoref<DummyLabel> dumpLabel_; // the iteration data
+	mutable Autoref<FnReturn> fnReturn_; // the FnReturn object for table results
 	AggGadgetVec aggs_; // gadgets for all aggregators, matching the order in TableType
 	string name_; // base name of the table
 	bool busy_; // flag: an operation is in progress on the table

@@ -1,6 +1,12 @@
 Things that need to be done:
 * redo the errors to confess
+* change the typemap to confess
 * more features for the SimpleAggregator
+ ** standard deviation can be done in one pass
+ ** median and percentiles on sorted indexes
+ ** multi-stage functions
+* keys() in ordered indexes
+* index introspection: getOrder() (for each field A or D, or maybe 1 and -1, and 0 for un-ordered)
 * in RowHandle add getTable()
 * add the row contents access methods directly on a row handle?
 * in Row add the array index argument in get(), a version of get by index
@@ -33,13 +39,56 @@ Things that need to be done:
 * in the C++-underlying-Perl objects have a place to keep $self,
   with $obj->getSelf()->{CLASS} containing the blessing.
 * when printing table types and such, make sure to \-escape the funny characters
-* change the XS type checking to confess instead of plain dying
 * in Triceps::Fields::makeTranslation take the filter specs as arguments, and the caller's name
+* in Type add a generic checkOrThrow(), maybe a template for initializeOrThrow()?
+* in Type::Fields add parsing of the type names including the array indicators
+* add the "distclean" to include the cleaning of docs
+* in Types: make initialize() return an Onceref, make initializeOrThrow() and
+  checkOrThrow() templates. In RowSetType change freeze() to initialize().
+* instead of giving names to aggregator types themselves, give them names
+  inside a table (like to indexes)
+* initialize aggregators after all the indexes have been initialized
+* examples for streaming functions: RIC/SEDOL/ISIN lookup,
+  a TCP implementation?, queries from multiple sources, then filtering,
+  join results (iterating over results of LookupJoin),
+  queue with multiple readers; in Collapse group the deletes with inserts
+  by forking a delete row to an insert table on flush
+* Expand pattern: when the result of a join contains everything from the left
+  side plus some from the right side, there is no need to keep the original
+  pre-join left side (and the join result table can be used to generate the
+  correct updates to send into the left side of the joib)
+* for rows containing token-value pairs (array of token names, array of values),
+  an index on tokens.
+* make the Aggregator object optional, with NULL used in case if it's
+  not needed (and could save an spot in GroupHandle too). Call the method
+  handle() in the AggregatorType. BasicAggregator doesn't need gadget_.
+* in JoinTwo require that only the input labels are of the same unit,
+  tables may be different unit
+* aggregation: add an option for mandatory keeping of the last row,
+  and a way to find and iterate them (thus avoiding a separate table)
+* in Perl FnReturn add the argument
+  handler, and pass the args directly in push(), like [$fbind, @args...].
+* A more strict handling of frame marks?
+* add table dumping by condition
+* add callAsChained in Perl
+* in FnReturn add an option to act as a local nexus
+* in JoinTwo add a mode that would allow to compute the initial join of two
+  pre-existing tables, then disable thsi mode and continue with the subscription
+* add an override of the printed label name in print(), printP() and code 
+  that constructs labels around it
 
 * doc: the SQLy way, refer to the filtering example in sc_joins_lookup_manual
 
+* doc: the Exception::f, ::fTrace
+* doc: errefAppend()
+* doc: streaming functions
+* doc: perl Label::isCleared()
+* doc: in types construction throw instead of abort()
+* doc: the templates for initialize(), initializeOrThrow(), checkOrThrow()
+* doc: the new draining of forked rowops, new mark semantics
+
 App ideas:
-* queries on CSV files
+* queries on CSV files - already done in DBD::CSV?
 * distributed cron
 * data cache
 

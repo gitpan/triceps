@@ -44,6 +44,7 @@ Table::Table(Unit *unit, EnqMode emode, const string &name,
 	inputLabel_(new InputLabel(unit, rowt, name + ".in", this)),
 	firstLeaf_(tt->getFirstLeaf()),
 	preLabel_(new DummyLabel(unit, rowt, name + ".pre")),
+	dumpLabel_(new DummyLabel(unit, rowt, name + ".dump")),
 	name_(name),
 	busy_(false)
 { 
@@ -94,6 +95,26 @@ Label *Table::getAggregatorLabel(const string &agname) const
 	return NULL;
 }
 
+FnReturn *Table::fnReturn() const
+{
+	if (fnReturn_.isNull()) {
+		fnReturn_ = FnReturn::make(unit_, name_ + ".fret")
+			->addFromLabel("out", label_)
+			->addFromLabel("pre", preLabel_)
+			->addFromLabel("dump", dumpLabel_)
+		;
+		for (AggGadgetVec::const_iterator it = aggs_.begin(); it != aggs_.end(); ++it) {
+			fnReturn_->addFromLabel( (*it)->getType()->getName(), (*it)->getLabel() );
+		}
+		try {
+			initializeOrThrow(fnReturn_);
+		} catch (Exception e) {
+			throw Exception::f(e, "Failed to create an FnReturn on table '%s':", name_.c_str());
+		}
+	}
+	return fnReturn_;
+}
+
 RowHandle *Table::makeRowHandle(const Row *row) const
 {
 	if (row == NULL)
@@ -117,19 +138,19 @@ void Table::destroyRowHandle(RowHandle *rh) const
 	delete rh;
 }
 
-bool Table::insertRow(const Row *row, Tray *copyTray)
+bool Table::insertRow(const Row *row)
 {
 	if (row == NULL)
 		return false;
 
 	Rhref what(this, makeRowHandle(row));
 
-	bool res = insert(what, copyTray); // may throw
+	bool res = insert(what); // may throw
 
 	return res;
 }
 
-bool Table::insert(RowHandle *newrh, Tray *copyTray)
+bool Table::insert(RowHandle *newrh)
 {
 	if (newrh == NULL)
 		return false;
@@ -156,15 +177,15 @@ bool Table::insert(RowHandle *newrh, Tray *copyTray)
 		if (!root_->replacementPolicy(newrh, replace)) {
 			// this may have created the groups for the new record that didn't get inserted, so collapse them back
 			changed.insert(newrh); // OK to add, since the iterators in newrh get populated by replacementPolicy()
-			root_->collapse(aggTray, changed, copyTray); // aggTray may be NULL, it's OK with no aggregators
+			root_->collapse(aggTray, changed); // aggTray may be NULL, it's OK with no aggregators
 			// aggTray should be empty, so don't send it anywhere
 			return false;
 		}
 
 		if (!noAggs) {
 			changed.insert(newrh); // OK to add, since the iterators in newrh got populated by replacementPolicy()
-			root_->aggregateBefore(aggTray, replace, emptyRhSet, copyTray);
-			root_->aggregateBefore(aggTray, changed, replace, copyTray);
+			root_->aggregateBefore(aggTray, replace, emptyRhSet);
+			root_->aggregateBefore(aggTray, changed, replace);
 			// Aggregator "before" changes go before table changes. If there are multiple aggregators,
 			// between themselves they go sort of in parallel.
 			unit_->enqueueDelayedTray(aggTray); // may throw
@@ -181,7 +202,7 @@ bool Table::insert(RowHandle *newrh, Tray *copyTray)
 			root_->remove(rh);
 			rh->flags_ &= ~RowHandle::F_INTABLE;
 			deref.push_back(rh);
-			send(rh->getRow(), Rowop::OP_DELETE, copyTray); // may throw
+			send(rh->getRow(), Rowop::OP_DELETE); // may throw
 		}
 
 		if (preLabel_->hasChained()) {
@@ -194,11 +215,11 @@ bool Table::insert(RowHandle *newrh, Tray *copyTray)
 		newrh->flags_ |= RowHandle::F_INTABLE;
 
 		root_->insert(newrh);
-		send(newrh->getRow(), Rowop::OP_INSERT, copyTray); // may throw
+		send(newrh->getRow(), Rowop::OP_INSERT); // may throw
 
 		if (!noAggs) {
-			root_->aggregateAfter(aggTray, Aggregator::AO_AFTER_DELETE, replace, changed, copyTray);
-			root_->aggregateAfter(aggTray, Aggregator::AO_AFTER_INSERT, changed, emptyRhSet, copyTray);
+			root_->aggregateAfter(aggTray, Aggregator::AO_AFTER_DELETE, replace, changed);
+			root_->aggregateAfter(aggTray, Aggregator::AO_AFTER_INSERT, changed, emptyRhSet);
 			// Aggregator "after" changes go after table changes. If there are multiople aggregators,
 			// between themselves they go sort of in parallel.
 			unit_->enqueueDelayedTray(aggTray); // may throw
@@ -206,7 +227,7 @@ bool Table::insert(RowHandle *newrh, Tray *copyTray)
 		}
 
 		// finally, collapse the groups of the replaced records
-		root_->collapse(aggTray, replace, copyTray);
+		root_->collapse(aggTray, replace);
 
 		if (!noAggs && !aggTray->empty()) {
 			// The aggregators may have produced more output on collapse.
@@ -234,7 +255,7 @@ bool Table::insert(RowHandle *newrh, Tray *copyTray)
 	return true;
 }
 
-void Table::remove(RowHandle *rh, Tray *copyTray)
+void Table::remove(RowHandle *rh)
 {
 	if (rh == NULL || !rh->isInTable())
 		return;
@@ -256,7 +277,7 @@ void Table::remove(RowHandle *rh, Tray *copyTray)
 
 	try {
 		if (!noAggs) {
-			root_->aggregateBefore(aggTray, replace, emptyRhSet, copyTray);
+			root_->aggregateBefore(aggTray, replace, emptyRhSet);
 			// Aggregator "before" changes go before table changes. If there are multiople aggregators,
 			// between themselves they go sort of in parallel.
 			unit_->enqueueDelayedTray(aggTray); // may throw
@@ -272,17 +293,17 @@ void Table::remove(RowHandle *rh, Tray *copyTray)
 		rh->flags_ &= ~RowHandle::F_INTABLE;
 		rhdec = rh;
 
-		send(rh->getRow(), Rowop::OP_DELETE, copyTray); // may throw
+		send(rh->getRow(), Rowop::OP_DELETE); // may throw
 
 		if (!noAggs) {
-			root_->aggregateAfter(aggTray, Aggregator::AO_AFTER_DELETE, replace, emptyRhSet, copyTray);
+			root_->aggregateAfter(aggTray, Aggregator::AO_AFTER_DELETE, replace, emptyRhSet);
 			// Aggregator "after" changes go after table changes. If there are multiple aggregators,
 			// between themselves they go sort of in parallel.
 			unit_->enqueueDelayedTray(aggTray); // may throw
 			aggTray->clear();
 		}
 
-		root_->collapse(aggTray, replace, copyTray);
+		root_->collapse(aggTray, replace);
 		
 		if (!noAggs && !aggTray->empty()) {
 			// The aggregators may have produced more output on collapse.
@@ -303,12 +324,12 @@ void Table::remove(RowHandle *rh, Tray *copyTray)
 	}
 }
 
-bool Table::deleteRow(const Row *row, Tray *copyTray)
+bool Table::deleteRow(const Row *row)
 {
 	Rhref what(this, makeRowHandle(row));
 	RowHandle *rh = find(what);
 	if (rh != NULL) {
-		remove(rh, copyTray); // may throw
+		remove(rh); // may throw
 		return true;
 	}
 	return false;
@@ -410,6 +431,30 @@ size_t Table::groupSizeRowIdx(IndexType *ixt, const Row *row) const
 		destroyRowHandle(rh);
 
 	return res;
+}
+
+void Table::clear(size_t limit)
+{
+	RowHandle *rh;
+	while ((rh = begin()) != NULL) {
+		remove(rh);
+		if (limit != 0 && --limit == 0)
+			break;
+	}
+}
+
+void Table::dumpAll(Rowop::Opcode op) const
+{
+	for (RowHandle *rh = begin(); rh != NULL; rh = next(rh))
+		unit_->call(new Rowop(dumpLabel_, op, rh->getRow()));
+}
+
+void Table::dumpAllIdx(IndexType *ixt, Rowop::Opcode op) const
+{
+	if (ixt == NULL)
+		ixt = firstLeaf_;
+	for (RowHandle *rh = beginIdx(ixt); rh != NULL; rh = nextIdx(ixt, rh))
+		unit_->call(new Rowop(dumpLabel_, op, rh->getRow()));
 }
 
 }; // TRICEPS_NS

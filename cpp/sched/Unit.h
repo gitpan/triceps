@@ -62,14 +62,20 @@ protected:
 // and its frame is found empty, the frame gets popped. The outermost frame
 // is never popped from the stack even when it's completely empty.
 //
-// There are 3 ways to add rowops to the queue:
+// There are 4 ways to add rowops to the queue:
 // 1. To the tail of the outermost frame. It's to schedule some delayed processing
 //    for later, when the whole current queue is consumed.
+//    [schedule]
 // 2. To the tail of the current frame. This delays the processing of that rowop until
-//    all the effects from the rowop being processed now are finished.
-// 3. To push a new frame, add the rowop there, and immediately start executing it.
+//    the processing of the current rowop completes.
+//    [fork]
+// 3. To the tail of another (ancestor) frame, pointed to by the FrameMark. 
+//    This delays the processing of that rowop until that ancestor rowop completes.
+//    [loopAt]
+// 4. To push a new frame, add the rowop there, and immediately start executing it.
 //    This works like a function call, making sure that all the effects from that
 //    rowop are finished before the current processing resumes.
+//    [call]
 //
 // Since the Units in different threads need to communicate, it's an Mtarget.
 //
@@ -105,6 +111,28 @@ public:
 	// Then pop that frame, restoring the stack of queues.
 	// May throw an Exception on fatal error.
 	void callTray(const_Onceref<Tray> tray);
+
+	// Call a label like as if it were chained: reusing the current frame,
+	// and overriding the label specified in the rowop.
+	//
+	// This methdod is fundamentally dangerous and must be used with
+	// great care, ensuring the correct arguments.
+	//
+	// The caller must keep references to all the arguments for the
+	// duration of the call. So for example you can't just pass a
+	// "new Rowop(...)" as an argument. You have to assign it to an
+	// Autoref<Rowop> and then you can use it as an argument.
+	//
+	// @param label - label to call
+	// @param rop - rowop to execute, the label from it will be ignored
+	//        (however the row type of the label argument and of the label in
+	//        rowop must match, or things will crash)
+	// @param chainedFrom - the label from which the called one has been virtually
+	//        chained; may be NULL
+	void callAsChained(const Label *label, Rowop *rop, const Label *chainedFrom)
+	{
+		label->call(this, rop, chainedFrom);
+	}
 
 	// Enqueue the rowop with the chosen mode. This is mostly for convenience
 	// of Perl code but can be used in other places too, performs a switch
@@ -159,9 +187,30 @@ public:
 	// Extract and execute the next record from the innermost frame.
 	// May throw an Exception on fatal error.
 	void callNext();
-	// Execute until the current stack frame drains.
+	// Execute callNext() until the current stack frame drains.
+	// Normally used only on the outermost frame.
 	// May throw an Exception on fatal error.
 	void drainFrame();
+
+	// API for the Label execution machinery. Not intended to be called
+	// directly by the user.
+	// {
+	
+	// Extract and execute the next record from the innermost frame.
+	// Does not push a new frame, executes directly in the parent's frame
+	// May throw an Exception on fatal error.
+	void callNextForked();
+	// Execute callNextForked() the current stack frame drains.
+	// Calls the tracing notifications around it.
+	// Normally used to process the forked records after a label call returns.
+	// May throw an Exception on fatal error.
+	// @param lab - Label that has created the frame. Used for the tracing
+	//     notification and error messages.
+	// @param rop - Rowop that has created the frame. Used for the tracing
+	//     notification.
+	void drainForkedFrame(const Label *lab, Rowop *rop);
+
+	// } Label execution.
 
 	// Check whether the queue is empty.
 	// @return - if no rowops in the whole queue
@@ -221,20 +270,30 @@ public:
 		return emptyRowType_;
 	}
 
-	// }
+	// } Label management
 
 	// Tracing interface.
 	// Often it's hard to figure out, how a certain result got produced.
 	// This allows the user to trace the whole execution sequence.
 	// {
 
-	// the tracer function is called multiple times during the processing of a rowop,
-	// with the indication of when it's called:
+	// The tracer function is called multiple times during the processing of a rowop,
+	// with the indication of when it's called.
+	// The full sequence is:
+	// TW_BEFORE
+	// TW_BEFORE_CHAINED - only if has chained labels
+	// TW_AFTER_CHAINED  /
+	// TW_AFTER
+	// TW_BEFORE_DRAIN - only if had forked/looped rowops
+	// TW_AFTER_DRAIN  /
 	enum TracerWhen {
+		// The values go starting from 0 in before-after pairs
 		TW_BEFORE, // before calling the label's execution as such
-		TW_BEFORE_DRAIN, // after execution as such, before draining the frame
-		TW_BEFORE_CHAINED, // after execution and draining, before calliong the chained labels
 		TW_AFTER, // after all the execution is done
+		TW_BEFORE_CHAINED, // after execution, before calliong the chained labels (if they are present)
+		TW_AFTER_CHAINED, // after calliong the chained labels (if they were present)
+		TW_BEFORE_DRAIN, // before draining the label's frame if it's not empty
+		TW_AFTER_DRAIN, // after draining the label's frame if was not empty
 		// XXX should there be events on enqueueing?
 	};
 
@@ -245,6 +304,16 @@ public:
 	// convert the when-code to a more human-readable string (better for debug messages and such)
 	static const char *tracerWhenHumanString(int when, const char *def = "???");
 	static int humanStringTracerWhen(const char *when);
+
+	// Determines if the code is "before" or "after" (or maybe neither).
+	static bool tracerWhenIsBefore(int when)
+	{
+		return !(when & 1);
+	}
+	static bool tracerWhenIsAfter(int when)
+	{
+		return (when & 1);
+	}
 
 	// The type of tracer callback functor: inherit from it and redefine your own execute()
 	class Tracer : public Mtarget
@@ -316,13 +385,66 @@ public:
 	// May throw an Exception on fatal error.
 	void trace(const Label *label, const Label *fromLabel, Rowop *rop, TracerWhen when);
 
-	// }
+	// } Tracing
+	
+	// In some cases the recursion may be desired.
+	// This allows to enable the recursion.
+	// {
+
+	// Set the maximal allowed Triceps call stack depth for this unit.
+	// When the unit is constructed, the default is unlimited (0).
+	//
+	// In practice there is also always the implicit limit of the C++ thread
+	// stack size, but it's usually difficult to overrun without recursion.
+	// See the comment for setMaxRecursionDepth().
+	//
+	// @param v - the limit; <=0 means "unlimited".
+	void setMaxStackDepth(int v)
+	{
+		maxStackDepth_ = v;
+	}
+
+	int maxStackDepth() const
+	{
+		return maxStackDepth_;
+	}
+
+	// Set the maximal allowed label recursion depth for this unit.
+	// I.e. it's the number of times a label can be present on the call stack.
+	//
+	// 1 means only call once, no recursion. 2 means that the label may call
+	// itself (directly or indirectly) once. And so on.
+	// When the unit is constructed, the default is 1 (no recursion).
+	//
+	// Setting this limit higher than the maximal stack depth makes no sense.
+	//
+	// Be careful with the unlimted and other very high values: 
+	// you still have an implicit limit in the form of the C++ thread stack
+	// size. If you overrun the stack, the process will die and (optionally)
+	// dump core.
+	//
+	// @param v - the limit; <=0 means "unlimited".
+	void setMaxRecursionDepth(int v)
+	{
+		maxRecursionDepth_ = v;
+	}
+
+	int maxRecursionDepth() const
+	{
+		return maxRecursionDepth_;
+	}
+	// } Recursion control
+	
 protected:
 	// Push a new frame onto the stack.
 	void pushFrame();
 
 	// Pop the current frame from stack.
 	void popFrame();
+
+	// A common internal implementation for call(). 
+	// @param rop - rowop to call. It must be held by the caller until returned.
+	void callGuts(Rowop *rop);
 
 protected:
 	// the scheduling queue, trays work as stack frames on it
@@ -339,6 +461,9 @@ protected:
 	// Keeping track of labels
 	typedef map<Label *, Autoref<Label> > LabelMap;
 	LabelMap labelMap_;
+	int maxStackDepth_; // limit on the call stack depth, <= 0 means unlimited
+	int maxRecursionDepth_; // limit on the recursive calls of the same label, <= 0 means unlimited
+	bool clearing_; // prevents the recursive calls to clearLabels & friends
 
 private:
 	Unit(const Unit &);

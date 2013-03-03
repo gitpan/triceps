@@ -99,9 +99,7 @@ bool callbackEquals(const PerlCallback *p1, const PerlCallback *p2);
 //       PerlCallbackStartCall(cb);
 //       ... push fixed arguments ...
 //       PerlCallbackDoCall(cb);
-//       if (SvTRUE(ERRSV)) {
-//           ... print a warning ...
-//       }
+//       callbackSuccessOrThrow();
 //   }
 //
 // The normal call that retuns a scalar is done as follows:
@@ -110,11 +108,14 @@ bool callbackEquals(const PerlCallback *p1, const PerlCallback *p2);
 //       PerlCallbackStartCall(cb);
 //       ... push fixed arguments ...
 //       PerlCallbackDoCallScalar(cb, result);
+//       callbackSuccessOrThrow();
+//       ... process the result ...
+//   }
+//
+//   If don't want to throw, use instead the manual error check:
 //       if (SvTRUE(ERRSV)) {
 //           ... print a warning ...
 //       }
-//       ... process the result ...
-//   }
 
 // Start the call sequence.
 // @param cb - callback object poniter
@@ -168,6 +169,17 @@ bool callbackEquals(const PerlCallback *p1, const PerlCallback *p2);
 		FREETMPS; LEAVE; \
 	} while(0)
 
+// Check ERRSV for the callback execution errors.
+// If any errors found throws an Exception with the error message
+// constructed of the text of ERRSV and the arguments.
+// Since the typical situation invilve sthe stack unroll,
+// the error is created not nested but first the ERRSV text,
+// then at the same level the arguments.
+//
+// @param fmt, ... - the prefix for the error message
+void callbackSuccessOrThrow(const char *fmt, ...)
+	__attribute__((format(printf, 1, 2)));
+
 // Label that executes Perl code
 class PerlLabel : public Label
 {
@@ -181,6 +193,22 @@ public:
 	PerlLabel(Unit *unit, const_Onceref<RowType> rtype, const string &name, 
 		Onceref<PerlCallback> clr, Onceref<PerlCallback> cb);
 	~PerlLabel();
+
+	// Create a simple Perl label with the default clearing callback
+	// and the code reference snippet for the body, no arguments.
+	// A factory method used in the FnBinding abd such.
+	// It could be a common constructor, excapt that it throws an
+	// Exception if it finds any error.
+	//
+	// @param unit - the unit where this label belongs
+	// @param rtype - type of row to be handled by this label
+	// @param name - a human-readable name of this label, for tracing
+	// @param code - a function reference (if not, will throw an error)
+	// @param fmt, ... - the prefix for the error message
+	// @return - the newly constructed label
+	static Onceref<PerlLabel> makeSimple(Unit *unit, const_Onceref<RowType> rtype,
+		const string &name, SV *code, const char *fmt, ...)
+		__attribute__((format(printf, 5, 6)));
 
 	// Get back the code reference (don't give it directly to random Perl code,
 	// make a copy!)
@@ -222,6 +250,20 @@ public:
 protected:
 	Autoref<PerlCallback> cb_;
 };
+
+// Extract a function reference from a Perl SV value.
+// Throws a Triceps::Exception if the value is not an array reference.
+// (Similar to the others in TricepsPerl.h)
+//
+// @param svptr - the Perl SV* from which the value will be extracted.
+//     It can be in one of 2 formats:
+//         * a plain function reference
+//         * a reference to an array containing a function reference
+//           and the argument values for the call
+// @param fmt, ... - the prefix for the error message
+// @return - the newly created callback object
+Onceref<PerlCallback> GetSvCall(SV *svptr, const char *fmt, ...)
+	__attribute__((format(printf, 2, 3)));
 
 }; // Triceps::TricepsPerl
 }; // Triceps

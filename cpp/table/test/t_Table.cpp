@@ -90,9 +90,11 @@ UTESTCASE preLabel(Utest *utest)
 	UT_ASSERT(!t.isNull());
 	UT_ASSERT(t->getInputLabel() != NULL);
 	UT_ASSERT(t->getPreLabel() != NULL);
+	UT_ASSERT(t->getDumpLabel() != NULL);
 	UT_ASSERT(t->getLabel() != NULL);
 	UT_IS(t->getInputLabel()->getName(), "t.in");
 	UT_IS(t->getPreLabel()->getName(), "t.pre");
+	UT_IS(t->getDumpLabel()->getName(), "t.dump");
 	UT_IS(t->getLabel()->getName(), "t.out");
 
 	FdataVec dv;
@@ -165,6 +167,35 @@ UTESTCASE preLabel(Utest *utest)
 		"unit 'u' before label 't.out' op OP_INSERT\n"
 		"unit 'u' before label 'lsize' (chain 't.out') op OP_INSERT\n"
 		"table size 2\n"
+	);
+
+	// Getting an FnReturn creates it and chains it to the "out", "pre", "dump" labels.
+	FnReturn *fr = t->fnReturn();
+	UT_ASSERT(fr != NULL);
+	UT_IS(t->fnReturn(), fr); // repeated calls return the same object
+	UT_IS(fr->getName(), "t.fret");
+
+	// check that the FnReturn labels get called
+	trace->clearBuffer();
+	UT_ASSERT(t->insertRow(r12)); // this will do a DELETE then INSERT
+	tlog = trace->getBuffer()->print();
+	UT_IS(tlog, 
+		"unit 'u' before label 't.pre' op OP_DELETE\n"
+		"unit 'u' before label 'lsize' (chain 't.pre') op OP_DELETE\n"
+		"table size 2\n"
+		"unit 'u' before label 't.fret.pre' (chain 't.pre') op OP_DELETE\n"
+		"unit 'u' before label 't.out' op OP_DELETE\n"
+		"unit 'u' before label 'lsize' (chain 't.out') op OP_DELETE\n"
+		"table size 1\n"
+		"unit 'u' before label 't.fret.out' (chain 't.out') op OP_DELETE\n"
+		"unit 'u' before label 't.pre' op OP_INSERT\n"
+		"unit 'u' before label 'lsize' (chain 't.pre') op OP_INSERT\n"
+		"table size 1\n"
+		"unit 'u' before label 't.fret.pre' (chain 't.pre') op OP_INSERT\n"
+		"unit 'u' before label 't.out' op OP_INSERT\n"
+		"unit 'u' before label 'lsize' (chain 't.out') op OP_INSERT\n"
+		"table size 2\n"
+		"unit 'u' before label 't.fret.out' (chain 't.out') op OP_INSERT\n"
 	);
 }
 
@@ -476,3 +507,126 @@ UTESTCASE groupSize(Utest *utest)
 	UT_IS(t->groupSizeRowIdx(bcixt, r12), 3);
 }
 
+// check the deteles from clear()
+class LabelDelete : public Label
+{
+public:
+	LabelDelete(Unit *unit, Onceref<RowType> rtype, const string &name,
+			int32_t initial, Utest *ut) :
+		Label(unit, rtype, name),
+		nextval_(initial),
+		utest(ut)
+	{ }
+
+	virtual void execute(Rowop *arg) const
+	{
+		UT_IS(arg->getOpcode(), Rowop::OP_DELETE);
+		UT_IS(getType()->getInt32(arg->getRow(), 1), nextval_);
+		++nextval_;
+	}
+
+	mutable int32_t nextval_;
+	Utest *utest; // must be without _ for the UT_* macros to work
+};
+
+UTESTCASE clear(Utest *utest)
+{
+	RowType::FieldVec fld;
+	mkfields(fld);
+
+	Autoref<Unit> unit = new Unit("u");
+	// Autoref<Unit::StringNameTracer> trace = new Unit::StringNameTracer;
+	// unit->setTracer(trace);
+
+	Autoref<RowType> rt1 = new CompactRowType(fld);
+	UT_ASSERT(rt1->getErrors().isNull());
+
+	Autoref<TableType> tt = initializeOrThrow(TableType::make(rt1)
+		->addSubIndex("fifo", new FifoIndexType())
+	);
+
+	Autoref<Table> t = tt->makeTable(unit, Table::EM_CALL, "t");
+	UT_ASSERT(!t.isNull());
+
+	FdataVec dv;
+	mkfdata(dv);
+	
+	int32_t v32 = 0;
+
+	dv[1].data_ = (char *)&v32;
+	for (v32 = 0; v32 < 10; v32++) {
+		Rhref rh1(t, dv);
+		t->insert(rh1);
+	}
+
+	Autoref<LabelDelete> ldel = new LabelDelete(unit, rt1, "ldel", 0, utest);
+	t->getLabel()->chain(ldel);
+
+	t->clear(3);
+	UT_IS(ldel->nextval_, 3);
+	t->clear();
+	t->clear(99);
+	UT_IS(ldel->nextval_, 10);
+	UT_IS(ldel->nextval_, 10);
+}
+
+UTESTCASE dumpAll(Utest *utest)
+{
+	RowType::FieldVec fld;
+	mkfields(fld);
+
+	Autoref<Unit> unit = new Unit("u");
+	Autoref<Unit::StringNameTracer> trace = new Unit::StringNameTracer;
+	unit->setTracer(trace);
+
+	Autoref<RowType> rt1 = new CompactRowType(fld);
+	UT_ASSERT(rt1->getErrors().isNull());
+
+	Autoref<TableType> tt = initializeOrThrow(TableType::make(rt1)
+		->addSubIndex("fifo", new FifoIndexType())
+	);
+
+	Autoref<IndexType> idx = tt->getFirstLeaf();
+
+	Autoref<Table> t = tt->makeTable(unit, Table::EM_CALL, "t");
+	UT_ASSERT(!t.isNull());
+
+	FdataVec dv;
+	mkfdata(dv);
+	
+	// One record only. Anything smarter is tested in Perl.
+	Rhref rh1(t, dv);
+	t->insert(rh1);
+
+	string tlog;
+	
+	// dumpAll, explicit opcode
+	trace->clearBuffer();
+	t->dumpAll(Rowop::OP_DELETE);
+	tlog = trace->getBuffer()->print();
+	UT_IS(tlog, "unit 'u' before label 't.dump' op OP_DELETE\n");
+	
+	// dumpAll, default opcode
+	trace->clearBuffer();
+	t->dumpAll();
+	tlog = trace->getBuffer()->print();
+	UT_IS(tlog, "unit 'u' before label 't.dump' op OP_INSERT\n");
+	
+	// dumpAllIdx, explicit opcode
+	trace->clearBuffer();
+	t->dumpAllIdx(idx, Rowop::OP_DELETE);
+	tlog = trace->getBuffer()->print();
+	UT_IS(tlog, "unit 'u' before label 't.dump' op OP_DELETE\n");
+	
+	// dumpAllIdx, default opcode
+	trace->clearBuffer();
+	t->dumpAllIdx(idx);
+	tlog = trace->getBuffer()->print();
+	UT_IS(tlog, "unit 'u' before label 't.dump' op OP_INSERT\n");
+	
+	// dumpAllIdx, default opcode, default index
+	trace->clearBuffer();
+	t->dumpAllIdx(NULL);
+	tlog = trace->getBuffer()->print();
+	UT_IS(tlog, "unit 'u' before label 't.dump' op OP_INSERT\n");
+}

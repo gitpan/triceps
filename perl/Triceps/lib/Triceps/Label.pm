@@ -7,7 +7,7 @@
 
 package Triceps::Label;
 
-our $VERSION = 'v1.0.1';
+our $VERSION = 'v1.0.91';
 
 use Carp;
 
