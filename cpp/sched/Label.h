@@ -1,5 +1,5 @@
 //
-// (C) Copyright 2011-2012 Sergey A. Babkin.
+// (C) Copyright 2011-2013 Sergey A. Babkin.
 // This file is a part of Triceps.
 // See the file COPYRIGHT for the copyright notice and license information
 //
@@ -43,7 +43,7 @@ public:
 	// @param unit - the unit where this label belongs
 	// @param rtype - type of row to be handled by this label
 	// @param name - a human-readable name of this label, for tracing
-	Label(Unit *unit, const_Onceref<RowType> rtype, const string &name = "");
+	Label(Unit *unit, const_Onceref<RowType> rtype, const string &name);
 	
 	virtual ~Label();
 
@@ -70,8 +70,10 @@ public:
 	// and output labels of a table or such.
 	//
 	// @param lab - other label to chain here
+	// @param front - flag: put this label to the front of the chain (to make it
+	//        chain-called first)
 	// @return - NULL ref if chained successfully, otherwise an error indication
-	Erref chain(Onceref<Label> lab);
+	Erref chain(Onceref<Label> lab, bool front = false);
 
 	// Clear the chain leading from this label.
 	void clearChained();

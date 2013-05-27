@@ -1,5 +1,5 @@
 //
-// (C) Copyright 2011-2012 Sergey A. Babkin.
+// (C) Copyright 2011-2013 Sergey A. Babkin.
 // This file is a part of Triceps.
 // See the file COPYRIGHT for the copyright notice and license information
 //
@@ -33,7 +33,16 @@ void setCroakMsg(const std::string &msg);
 const char *getCroakMsg();
 
 // Check the contents of the croak message, and if it's set then croak.
+// Make sure that no C++ objects requiring destruction are in scope
+// when calling this, to avoid the memory leaks.
 void croakIfSet();
+
+// Unconditionally croak with the stack trace.
+// The message must be a plain pointer to avoid the memory leaks.
+// Make sure that no C++ objects requiring destruction are in scope
+// when calling this, to avoid the memory leaks.
+void croakWithMsg(const char *msg)
+	__attribute__noreturn__;
 
 // Clear the perl $! variable and the Triceps::_CROAK_MSG.
 void clearErrMsg();
@@ -312,6 +321,15 @@ void GetSvWrap2(WrapClass1 *&wrap1, WrapClass2 *&wrap2, SV *svptr, const char *c
 // @param fmt, ... - the prefix for the error message
 void GetSvString(string &res, SV *svptr, const char *fmt, ...)
 	__attribute__((format(printf, 3, 4)));
+
+// Extract an int from a Perl SV value.
+// Throws a Triceps::Exception if the value is not SvIOK().
+//
+// @param svptr - the Perl SV* from which the value will be extracted
+// @param fmt, ... - the prefix for the error message
+// @return - the int value
+IV GetSvInt(SV *svptr, const char *fmt, ...)
+	__attribute__((format(printf, 2, 3)));
 
 // Extract an array reference from a Perl SV value.
 // Throws a Triceps::Exception if the value is not an array reference.

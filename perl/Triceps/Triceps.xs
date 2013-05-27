@@ -1,5 +1,5 @@
 //
-// (C) Copyright 2011-2012 Sergey A. Babkin.
+// (C) Copyright 2011-2013 Sergey A. Babkin.
 // This file is a part of Triceps.
 // See the file COPYRIGHT for the copyright notice and license information
 //
@@ -35,6 +35,14 @@ XS(boot_Triceps__FrameMark);
 XS(boot_Triceps__FnReturn); 
 XS(boot_Triceps__FnBinding); 
 XS(boot_Triceps__AutoFnBind); 
+XS(boot_Triceps__App); 
+XS(boot_Triceps__Triead); 
+XS(boot_Triceps__TrieadOwner); 
+XS(boot_Triceps__Facet); 
+XS(boot_Triceps__Nexus); 
+XS(boot_Triceps__AutoDrain); 
+XS(boot_Triceps__PerlValue); 
+XS(boot_Triceps__TrackedFile); 
 #ifdef __cplusplus
 };
 #endif
@@ -119,6 +127,38 @@ BOOT:
 	boot_Triceps__AutoFnBind(aTHX_ cv); 
 	SPAGAIN; POPs;
 	//
+	PUSHMARK(SP); if (items >= 2) { XPUSHs(ST(0)); XPUSHs(ST(1)); } PUTBACK; 
+	boot_Triceps__App(aTHX_ cv); 
+	SPAGAIN; POPs;
+	//
+	PUSHMARK(SP); if (items >= 2) { XPUSHs(ST(0)); XPUSHs(ST(1)); } PUTBACK; 
+	boot_Triceps__Triead(aTHX_ cv); 
+	SPAGAIN; POPs;
+	//
+	PUSHMARK(SP); if (items >= 2) { XPUSHs(ST(0)); XPUSHs(ST(1)); } PUTBACK; 
+	boot_Triceps__TrieadOwner(aTHX_ cv); 
+	SPAGAIN; POPs;
+	//
+	PUSHMARK(SP); if (items >= 2) { XPUSHs(ST(0)); XPUSHs(ST(1)); } PUTBACK; 
+	boot_Triceps__Facet(aTHX_ cv); 
+	SPAGAIN; POPs;
+	//
+	PUSHMARK(SP); if (items >= 2) { XPUSHs(ST(0)); XPUSHs(ST(1)); } PUTBACK; 
+	boot_Triceps__Nexus(aTHX_ cv); 
+	SPAGAIN; POPs;
+	//
+	PUSHMARK(SP); if (items >= 2) { XPUSHs(ST(0)); XPUSHs(ST(1)); } PUTBACK; 
+	boot_Triceps__AutoDrain(aTHX_ cv); 
+	SPAGAIN; POPs;
+	//
+	PUSHMARK(SP); if (items >= 2) { XPUSHs(ST(0)); XPUSHs(ST(1)); } PUTBACK; 
+	boot_Triceps__PerlValue(aTHX_ cv); 
+	SPAGAIN; POPs;
+	//
+	PUSHMARK(SP); if (items >= 2) { XPUSHs(ST(0)); XPUSHs(ST(1)); } PUTBACK; 
+	boot_Triceps__TrackedFile(aTHX_ cv); 
+	SPAGAIN; POPs;
+	//
 	// fprintf(stderr, "DEBUG Triceps items=%d sp=%p mark=%p\n", items, sp, mark);
 
 
@@ -151,8 +191,8 @@ isNop(int op)
 		RETVAL
 
 ############ conversions of strings to enum constants #############################
-# (this duplicates the Triceps:: constant definitions but comes useful once in a while
-# the error values are converted to undefs
+#// (this duplicates the Triceps:: constant definitions but comes useful once in a while
+#// the error values are converted to undefs
 
 int
 stringOpcode(char *val)
@@ -309,7 +349,7 @@ aggOpString(int val)
 	OUTPUT:
 		RETVAL
 
-# Works only on the constant, not on the string value.
+#// Works only on the constant, not on the string value.
 int
 tracerWhenIsBefore(int val)
 	CODE:
@@ -318,7 +358,7 @@ tracerWhenIsBefore(int val)
 	OUTPUT:
 		RETVAL
 
-# Works only on the constant, not on the string value.
+#// Works only on the constant, not on the string value.
 int
 tracerWhenIsAfter(int val)
 	CODE:
@@ -326,3 +366,16 @@ tracerWhenIsAfter(int val)
 		RETVAL = Unit::tracerWhenIsAfter(val);
 	OUTPUT:
 		RETVAL
+
+############ time in high resolution #############################################
+
+# Get the current timestamp in high resolution.
+double
+now()
+	CODE:
+		timespec tm;
+		clock_gettime(CLOCK_REALTIME, &tm);
+		RETVAL = (double)tm.tv_sec + (double)tm.tv_nsec / 1000000000.;
+	OUTPUT:
+		RETVAL
+

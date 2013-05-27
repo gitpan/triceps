@@ -1,5 +1,5 @@
 //
-// (C) Copyright 2011-2012 Sergey A. Babkin.
+// (C) Copyright 2011-2013 Sergey A. Babkin.
 // This file is a part of Triceps.
 // See the file COPYRIGHT for the copyright notice and license information
 //
@@ -25,12 +25,26 @@ namespace TRICEPS_NS {
 class Tray : public Starget, public deque< Autoref<Rowop> >
 {
 public:
+	typedef deque< Autoref<Rowop> > Deque;
+
 	Tray()
 	{}
 
 	Tray(const Tray &orig) :
 		deque< Autoref<Rowop> >(orig)
 	{ }
+
+#if 0
+	// The assignments happen to work out of the box, because the
+	// Starget assignment does the right thing and doesn't corrupt
+	// the counter. But for reference, how it would have looked
+	// explicitly.
+	Tray &operator=(const Tray &other)
+	{
+		Deque::operator=(other);
+		return *this;
+	}
+#endif
 };
 
 }; // TRICEPS_NS

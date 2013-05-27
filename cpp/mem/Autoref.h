@@ -1,5 +1,5 @@
 //
-// (C) Copyright 2011-2012 Sergey A. Babkin.
+// (C) Copyright 2011-2013 Sergey A. Babkin.
 // This file is a part of Triceps.
 // See the file COPYRIGHT for the copyright notice and license information
 //
@@ -154,6 +154,15 @@ public:
 	bool operator!=(const Autoref<OtherTarget> &ar)
 	{
 		return (ref_ != ar.get());
+	}
+
+	// Swap the contents of two Autorefs.
+	// The reference counts don't change.
+	void swap(Autoref &other)
+	{
+		Target *r = ref_;
+		ref_ = other.ref_;
+		other.ref_ = r;
 	}
 
 protected:

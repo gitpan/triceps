@@ -1,5 +1,5 @@
 //
-// (C) Copyright 2011-2012 Sergey A. Babkin.
+// (C) Copyright 2011-2013 Sergey A. Babkin.
 // This file is a part of Triceps.
 // See the file COPYRIGHT for the copyright notice and license information
 //
@@ -95,6 +95,7 @@ UTESTCASE mklabel(Utest *utest)
 
 	Autoref<Label> lab11 = new DummyLabel(unit1, rt1, "lab11");
 	Autoref<Label> lab12 = new DummyLabel(unit1, rt1, "lab12");
+	Autoref<Label> lab13 = new DummyLabel(unit1, rt1, "lab13");
 
 	UT_IS(lab1->getType(), rt1.get());
 	UT_IS(lab2->getType(), rt2.get());
@@ -154,6 +155,17 @@ UTESTCASE mklabel(Utest *utest)
 	UT_IS(lab1->getChain().size(), 2);
 	UT_ASSERT(lab1->getChain()[0] == lab11);
 	UT_ASSERT(lab1->getChain()[1] == lab12);
+
+	lab1->clearChained(); // clear again and chain from the front
+	UT_ASSERT(!lab1->hasChained());
+	UT_IS(lab1->getChain().size(), 0);
+	UT_ASSERT(!lab1->chain(lab11, true)->hasError());
+	UT_ASSERT(!lab1->chain(lab12, true)->hasError());
+	UT_ASSERT(!lab1->chain(lab13, true)->hasError());
+	UT_IS(lab1->getChain().size(), 3);
+	UT_ASSERT(lab1->getChain()[0] == lab13);
+	UT_ASSERT(lab1->getChain()[1] == lab12);
+	UT_ASSERT(lab1->getChain()[2] == lab11);
 
 	// play with names
 	UT_IS(lab1->getName(), "lab1");
@@ -352,7 +364,7 @@ UTESTCASE scheduling(Utest *utest)
 {
 	// make a unit 
 	Autoref<Unit> unit = new Unit("u");
-	Autoref<Unit::StringNameTracer> trace = new Unit::StringNameTracer;
+	Autoref<Unit::Tracer> trace = new Unit::StringNameTracer;
 	unit->setTracer(trace);
 
 	// make row for setting
@@ -520,12 +532,19 @@ UTESTCASE scheduling(Utest *utest)
 	UT_IS(tlog, expect_call_2);
 }
 
+// the row printer for tracing
+void printB(string &res, const RowType *rt, const Row *row)
+{
+	int32_t b = rt->getInt32(row, 1, 0); // field b at idx 1
+	res.append(strprintf(" b=%d", (int)b));
+}
+
 // test the chaining of labels
 UTESTCASE chaining(Utest *utest)
 {
 	// make a unit 
 	Autoref<Unit> unit = new Unit("u");
-	Autoref<Unit::StringNameTracer> trace = new Unit::StringNameTracer(true);
+	Autoref<Unit::Tracer> trace = new Unit::StringNameTracer(true);
 	unit->setTracer(trace);
 
 	// make row for setting
@@ -539,6 +558,10 @@ UTESTCASE chaining(Utest *utest)
 	mkfdata(dv);
 	Rowref r1(rt1,  rt1->makeRow(dv));
 
+	int32_t val4321 = 4321;
+	dv[1].setPtr(true, &val4321, sizeof(val4321));
+	Rowref r2(rt1,  rt1->makeRow(dv));
+
 	if (UT_ASSERT(!r1.isNull())) return;
 
 	// make a few labels
@@ -551,8 +574,8 @@ UTESTCASE chaining(Utest *utest)
 	UT_ASSERT(!lab1->chain(lab3)->hasError());
 	UT_ASSERT(!lab2->chain(lab3)->hasError());
 
-	Autoref<Rowop> op1 = new Rowop(lab1, Rowop::OP_INSERT, NULL);
-	Autoref<Rowop> op2 = new Rowop(lab1, Rowop::OP_DELETE, NULL);
+	Autoref<Rowop> op1 = new Rowop(lab1, Rowop::OP_INSERT, r1);
+	Autoref<Rowop> op2 = new Rowop(lab1, Rowop::OP_DELETE, r2);
 
 	unit->schedule(op1);
 	unit->schedule(op2);
@@ -597,7 +620,7 @@ UTESTCASE chaining(Utest *utest)
 
 	// now try the same with StringTracer, but since the pointers are unpredictable,
 	// just count the records
-	Autoref<Unit::StringTracer> trace2 = new Unit::StringTracer(true);
+	Autoref<Unit::Tracer> trace2 = new Unit::StringTracer(true);
 	unit->setTracer(trace2);
 	unit->schedule(op1);
 	unit->schedule(op2);
@@ -608,7 +631,7 @@ UTESTCASE chaining(Utest *utest)
 	// printf("StringTracer got:\n%s", trace2->getBuffer()->print().c_str());
 
 	// now the StringTracer not verbose
-	Autoref<Unit::StringTracer> trace3 = new Unit::StringTracer();
+	Autoref<Unit::Tracer> trace3 = new Unit::StringTracer();
 	unit->setTracer(trace3);
 	unit->schedule(op1);
 	unit->schedule(op2);
@@ -617,6 +640,48 @@ UTESTCASE chaining(Utest *utest)
 	UT_IS(trace3->getBuffer()->size(), 8);
 	// uncomment to check visually
 	// printf("StringTracer got:\n%s", trace3->getBuffer()->print().c_str());
+	
+	// now try the same with StringNameTracer with row printer
+	Autoref<Unit::Tracer> trace4 = new Unit::StringNameTracer(true, printB);
+	unit->setTracer(trace4);
+	unit->schedule(op1);
+	unit->schedule(op2);
+	unit->drainFrame();
+	UT_ASSERT(unit->empty());
+	UT_IS(trace4->getBuffer()->size(), 24);
+
+	string expect4 = 
+		"unit 'u' before label 'lab1' op OP_INSERT b=1234 {\n"
+		"unit 'u' before-chained label 'lab1' op OP_INSERT b=1234 {\n"
+			"unit 'u' before label 'lab2' (chain 'lab1') op OP_INSERT b=1234 {\n"
+			"unit 'u' before-chained label 'lab2' (chain 'lab1') op OP_INSERT b=1234 {\n"
+				"unit 'u' before label 'lab3' (chain 'lab2') op OP_INSERT b=1234 {\n"
+				"unit 'u' after label 'lab3' (chain 'lab2') op OP_INSERT b=1234 }\n"
+			"unit 'u' after-chained label 'lab2' (chain 'lab1') op OP_INSERT b=1234 }\n"
+			"unit 'u' after label 'lab2' (chain 'lab1') op OP_INSERT b=1234 }\n"
+
+			"unit 'u' before label 'lab3' (chain 'lab1') op OP_INSERT b=1234 {\n"
+			"unit 'u' after label 'lab3' (chain 'lab1') op OP_INSERT b=1234 }\n"
+		"unit 'u' after-chained label 'lab1' op OP_INSERT b=1234 }\n"
+		"unit 'u' after label 'lab1' op OP_INSERT b=1234 }\n"
+
+		"unit 'u' before label 'lab1' op OP_DELETE b=4321 {\n"
+		"unit 'u' before-chained label 'lab1' op OP_DELETE b=4321 {\n"
+			"unit 'u' before label 'lab2' (chain 'lab1') op OP_DELETE b=4321 {\n"
+			"unit 'u' before-chained label 'lab2' (chain 'lab1') op OP_DELETE b=4321 {\n"
+				"unit 'u' before label 'lab3' (chain 'lab2') op OP_DELETE b=4321 {\n"
+				"unit 'u' after label 'lab3' (chain 'lab2') op OP_DELETE b=4321 }\n"
+			"unit 'u' after-chained label 'lab2' (chain 'lab1') op OP_DELETE b=4321 }\n"
+			"unit 'u' after label 'lab2' (chain 'lab1') op OP_DELETE b=4321 }\n"
+
+			"unit 'u' before label 'lab3' (chain 'lab1') op OP_DELETE b=4321 {\n"
+			"unit 'u' after label 'lab3' (chain 'lab1') op OP_DELETE b=4321 }\n"
+		"unit 'u' after-chained label 'lab1' op OP_DELETE b=4321 }\n"
+		"unit 'u' after label 'lab1' op OP_DELETE b=4321 }\n"
+	;
+
+	tlog = trace4->getBuffer()->print();
+	if (UT_IS(tlog, expect4)) printf("Expected: \"%s\"\n", expect4.c_str());
 }
 
 // a class to build circular references between labels, to see how they
@@ -881,7 +946,7 @@ UTESTCASE markLoop(Utest *utest)
 {
 	// make a unit 
 	Autoref<Unit> unit = new Unit("u");
-	Autoref<Unit::StringNameTracer> trace = new Unit::StringNameTracer(false);
+	Autoref<Unit::Tracer> trace = new Unit::StringNameTracer(false);
 	unit->setTracer(trace);
 
 	// make row for setting

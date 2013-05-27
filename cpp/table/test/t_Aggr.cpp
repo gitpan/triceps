@@ -1,5 +1,5 @@
 //
-// (C) Copyright 2011-2012 Sergey A. Babkin.
+// (C) Copyright 2011-2013 Sergey A. Babkin.
 // This file is a part of Triceps.
 // See the file COPYRIGHT for the copyright notice and license information
 //
@@ -730,3 +730,441 @@ UTESTCASE aggLast(Utest *utest)
 	UT_IS(tlog, result_expect);
 }
 
+// aggregator that computes the sum of field C;
+// follows the outline of the Perl aggregators shown in xAgg.t
+void sumC(Table *table, AggregatorGadget *gadget, Index *index,
+        const IndexType *parentIndexType, GroupHandle *gh, Tray *dest,
+		Aggregator::AggOp aggop, Rowop::Opcode opcode, RowHandle *rh)
+{
+	// don't send the NULL record after the group becomes empty
+	if (opcode == Rowop::OP_NOP || parentIndexType->groupSize(gh) == 0)
+		return;
+	
+	int64_t sum = 0;
+	for (RowHandle *rhi = index->begin(); rhi != NULL; rhi = index->next(rhi)) {
+		sum += table->getRowType()->getInt64(rhi->getRow(), 2, 0); // field c at idx 2
+	}
+
+	// pick the rest of fields from the last row of the group
+	RowHandle *lastrh = index->last();
+
+	// build the result row; relies on the aggregator result being of the
+	// same type as the rows in the table
+	FdataVec fields;
+	table->getRowType()->splitInto(lastrh->getRow(), fields);
+	fields[2].setPtr(true, &sum, sizeof(sum)); // set the field c from the sum
+
+	// could use the table row type again, but to exercise a different code,
+	// use the aggregator's result type:
+	// gadget()->getType()->getRowType() and gadget->getLabel()->getType()
+	// are equivalent
+	Rowref res(gadget->getLabel()->getType(), fields);
+	// Potentially could even use directly
+	//     gadget->getLabel()->getType()->makeRow(fields)
+	// as the 2nd argument of sendDelayed() but it would cause a memory
+	// leak if the table's enqueueing mode is EM_IGNORE
+	gadget->sendDelayed(dest, res, opcode);
+}
+
+// the row printer for tracing
+void printEC(string &res, const RowType *rt, const Row *row)
+{
+	int64_t c = rt->getInt64(row, 2, 0); // field c at idx 2
+	const char *e = rt->getString(row, 4); // field e at idx 4
+	res.append(strprintf(" e=%s c=%d", e, (int)c));
+}
+
+// the Sum example that iterates over the group;
+UTESTCASE aggBasicSum(Utest *utest)
+{
+	RowType::FieldVec fld;
+	mkfields(fld);
+
+	Autoref<Unit> unit = new Unit("u");
+
+	Autoref<Unit::StringTracer> trace = new Unit::StringNameTracer(false, printEC);
+	unit->setTracer(trace);
+
+	Autoref<RowType> rt1 = new CompactRowType(fld);
+	UT_ASSERT(rt1->getErrors().isNull());
+
+	// there is no need for a primary index, put the aggregation
+	// index(es) as top-level
+	Autoref<TableType> tt = TableType::make(rt1)
+		->addSubIndex("Hashed", HashedIndexType::make( // will be the default index
+				(new NameSet())->add("e")
+			)->addSubIndex("Fifo", FifoIndexType::make()
+				->setAggregator(new BasicAggregatorType("aggr", rt1, sumC))
+			)
+		);
+
+	UT_ASSERT(tt);
+	tt->initialize();
+	UT_ASSERT(tt->getErrors().isNull());
+	UT_ASSERT(!tt->getErrors()->hasError());
+
+	Autoref<Table> t = tt->makeTable(unit, Table::EM_CALL, "t");
+	UT_ASSERT(!t.isNull());
+
+	FdataVec dv;
+	mkfdata(dv);
+
+	int64_t ival = 1; // a nicer value for "c"
+	dv[2].setPtr(true, &ival, sizeof(ival));
+
+	char sval[2] = "x"; // one-character string for "e"
+	dv[4].setPtr(true, &sval, sizeof(sval));
+
+	Rowref r11(rt1);
+
+	sval[0] = 'A';
+	r11 = rt1->makeRow(dv);
+	UT_ASSERT(t->insertRow(r11));
+	
+	sval[0] = 'B';
+	r11 = rt1->makeRow(dv);
+	UT_ASSERT(t->insertRow(r11));
+	
+	sval[0] = 'A';
+	r11 = rt1->makeRow(dv);
+	UT_ASSERT(t->insertRow(r11));
+	
+	sval[0] = 'A';
+	r11 = rt1->makeRow(dv);
+	UT_ASSERT(t->insertRow(r11));
+	
+	sval[0] = 'A';
+	r11 = rt1->makeRow(dv);
+	UT_ASSERT(t->deleteRow(r11));
+	
+	// this will delete the group
+	sval[0] = 'B';
+	r11 = rt1->makeRow(dv);
+	UT_ASSERT(t->deleteRow(r11));
+	
+	string expect = 
+		"unit 'u' before label 't.out' op OP_INSERT e=A c=1\n"
+		"unit 'u' before label 't.aggr' op OP_INSERT e=A c=1\n"
+		"unit 'u' before label 't.out' op OP_INSERT e=B c=1\n"
+		"unit 'u' before label 't.aggr' op OP_INSERT e=B c=1\n"
+		"unit 'u' before label 't.aggr' op OP_DELETE e=A c=1\n"
+		"unit 'u' before label 't.out' op OP_INSERT e=A c=1\n"
+		"unit 'u' before label 't.aggr' op OP_INSERT e=A c=2\n"
+		"unit 'u' before label 't.aggr' op OP_DELETE e=A c=2\n"
+		"unit 'u' before label 't.out' op OP_INSERT e=A c=1\n"
+		"unit 'u' before label 't.aggr' op OP_INSERT e=A c=3\n"
+		"unit 'u' before label 't.aggr' op OP_DELETE e=A c=3\n"
+		"unit 'u' before label 't.out' op OP_DELETE e=A c=1\n"
+		"unit 'u' before label 't.aggr' op OP_INSERT e=A c=2\n"
+		"unit 'u' before label 't.aggr' op OP_DELETE e=B c=1\n"
+		"unit 'u' before label 't.out' op OP_DELETE e=B c=1\n"
+		;
+
+	string tlog = trace->getBuffer()->print();
+	if (UT_IS(tlog, expect)) printf("Expected: \"%s\"\n", expect.c_str());
+}
+
+// aggregator class that computes the sum of field
+// follows the outline of the Perl aggregators shown in xAgg.t
+class MySumAggregator: public Aggregator
+{
+public:
+	// same as sumC but finds the field from the type
+	virtual void handle(Table *table, AggregatorGadget *gadget, Index *index,
+			const IndexType *parentIndexType, GroupHandle *gh, Tray *dest,
+			Aggregator::AggOp aggop, Rowop::Opcode opcode, RowHandle *rh);
+};
+
+class MySumAggregatorType: public AggregatorType
+{
+public:
+	// @param fname - field name to sum on
+	MySumAggregatorType(const string &name, const string &fname):
+		AggregatorType(name, NULL),
+		fname_(fname),
+		fidx_(-1)
+	{ }
+	// the copy constructor works fine
+	// (might set the non-NULL row type, but it will be overwritten 
+	// during initialization)
+	
+	// constructor for deep copy
+	// (might set the non-NULL row type, but it will be overwritten 
+	// during initialization)
+	MySumAggregatorType(const MySumAggregatorType &agg, HoldRowTypes *holder):
+		AggregatorType(agg, holder),
+		fname_(agg.fname_),
+		fidx_(agg.fidx_)
+	{ }
+
+	virtual AggregatorType *copy() const
+	{
+		return new MySumAggregatorType(*this);
+	}
+
+	virtual AggregatorType *deepCopy(HoldRowTypes *holder) const
+	{
+		return new MySumAggregatorType(*this, holder);
+	}
+
+	virtual bool equals(const Type *t) const
+	{
+		if (this == t)
+			return true; // self-comparison, shortcut
+
+		if (!AggregatorType::equals(t))
+			return false;
+		
+		const MySumAggregatorType *sumt = static_cast<const MySumAggregatorType *>(t);
+
+		if (fname_ != sumt->fname_)
+			return false;
+
+		return true;
+	}
+
+	virtual bool match(const Type *t) const
+	{
+		if (this == t)
+			return true; // self-comparison, shortcut
+
+		if (!AggregatorType::match(t))
+			return false;
+		
+		const MySumAggregatorType *sumt = static_cast<const MySumAggregatorType *>(t);
+
+		if (fname_ != sumt->fname_)
+			return false;
+
+		return true;
+	}
+
+	virtual AggregatorGadget *makeGadget(Table *table, IndexType *intype) const
+	{
+		return new AggregatorGadget(this, table, intype);
+	}
+
+	virtual Aggregator *makeAggregator(Table *table, AggregatorGadget *gadget) const
+	{
+		return new MySumAggregator;
+	}
+
+	virtual void initialize(TableType *tabtype, IndexType *intype)
+	{
+		const RowType *rt = tabtype->rowType();
+		setRowType(rt); // the result has the same type as the argument
+		fidx_ = rt->findIdx(fname_);
+		if (fidx_ < 0)
+			errors_.fAppend(new Errors(rt->print()), "Unknown field '%s' in the row type:", fname_.c_str());
+		else {
+			if (rt->fields()[fidx_].arsz_ != RowType::Field::AR_SCALAR
+			|| rt->fields()[fidx_].type_->getTypeId() != Type::TT_INT64)
+				errors_.fAppend(new Errors(rt->print()), 
+					"Field '%s' is not an int64 scalar in the row type:", fname_.c_str());
+		}
+		AggregatorType::initialize(tabtype, intype);
+	}
+
+	// called from the handler
+	int fieldIdx() const
+	{
+		return fidx_;
+	}
+	
+protected:
+	string fname_; // name of the field to sum, must be an int64
+	int fidx_; // index of field named fname_
+};
+
+// same as sumC but finds the field from the type
+void MySumAggregator::handle(Table *table, AggregatorGadget *gadget, Index *index,
+		const IndexType *parentIndexType, GroupHandle *gh, Tray *dest,
+		Aggregator::AggOp aggop, Rowop::Opcode opcode, RowHandle *rh)
+{
+	// don't send the NULL record after the group becomes empty
+	if (opcode == Rowop::OP_NOP || parentIndexType->groupSize(gh) == 0)
+		return;
+
+	int fidx = gadget->typeAs<MySumAggregatorType>()->fieldIdx();
+	
+	int64_t sum = 0;
+	for (RowHandle *rhi = index->begin(); rhi != NULL; rhi = index->next(rhi)) {
+		sum += table->getRowType()->getInt64(rhi->getRow(), fidx, 0);
+	}
+
+	// pick the rest of fields from the last row of the group
+	RowHandle *lastrh = index->last();
+
+	// build the result row; relies on the aggregator result being of the
+	// same type as the rows in the table
+	FdataVec fields;
+	table->getRowType()->splitInto(lastrh->getRow(), fields);
+	fields[fidx].setPtr(true, &sum, sizeof(sum));
+
+	// use the convenience wrapper version
+	gadget->sendDelayed(dest, fields, opcode);
+}
+
+// the Sum example that iterates over the group;
+UTESTCASE aggSum(Utest *utest)
+{
+	RowType::FieldVec fld;
+	mkfields(fld);
+
+	Autoref<Unit> unit = new Unit("u");
+
+	Autoref<Unit::StringTracer> trace = new Unit::StringNameTracer(false, printEC);
+	unit->setTracer(trace);
+
+	Autoref<RowType> rt1 = new CompactRowType(fld);
+	UT_ASSERT(rt1->getErrors().isNull());
+
+	// there is no need for a primary index, put the aggregation
+	// index(es) as top-level
+	Autoref<TableType> tt = TableType::make(rt1)
+		->addSubIndex("Hashed", HashedIndexType::make( // will be the default index
+				(new NameSet())->add("e")
+			)->addSubIndex("Fifo", FifoIndexType::make()
+				->setAggregator(new MySumAggregatorType("aggr", "c"))
+			)
+		);
+
+	UT_ASSERT(tt);
+	tt->initialize();
+	UT_ASSERT(tt->getErrors().isNull());
+	if (UT_ASSERT(!tt->getErrors()->hasError())) {
+		printf("Agg errors:\n%s", tt->getErrors()->print().c_str());
+		return;
+	}
+
+	Autoref<Table> t = tt->makeTable(unit, Table::EM_CALL, "t");
+	UT_ASSERT(!t.isNull());
+
+	FdataVec dv;
+	mkfdata(dv);
+
+	int64_t ival = 1; // a nicer value for "c"
+	dv[2].setPtr(true, &ival, sizeof(ival));
+
+	char sval[2] = "x"; // one-character string for "e"
+	dv[4].setPtr(true, &sval, sizeof(sval));
+
+	Rowref r11(rt1);
+
+	sval[0] = 'A';
+	r11 = rt1->makeRow(dv);
+	UT_ASSERT(t->insertRow(r11));
+	
+	sval[0] = 'B';
+	r11 = rt1->makeRow(dv);
+	UT_ASSERT(t->insertRow(r11));
+	
+	sval[0] = 'A';
+	r11 = rt1->makeRow(dv);
+	UT_ASSERT(t->insertRow(r11));
+	
+	sval[0] = 'A';
+	r11 = rt1->makeRow(dv);
+	UT_ASSERT(t->insertRow(r11));
+	
+	sval[0] = 'A';
+	r11 = rt1->makeRow(dv);
+	UT_ASSERT(t->deleteRow(r11));
+	
+	// this will delete the group
+	sval[0] = 'B';
+	r11 = rt1->makeRow(dv);
+	UT_ASSERT(t->deleteRow(r11));
+	
+	string expect = 
+		"unit 'u' before label 't.out' op OP_INSERT e=A c=1\n"
+		"unit 'u' before label 't.aggr' op OP_INSERT e=A c=1\n"
+		"unit 'u' before label 't.out' op OP_INSERT e=B c=1\n"
+		"unit 'u' before label 't.aggr' op OP_INSERT e=B c=1\n"
+		"unit 'u' before label 't.aggr' op OP_DELETE e=A c=1\n"
+		"unit 'u' before label 't.out' op OP_INSERT e=A c=1\n"
+		"unit 'u' before label 't.aggr' op OP_INSERT e=A c=2\n"
+		"unit 'u' before label 't.aggr' op OP_DELETE e=A c=2\n"
+		"unit 'u' before label 't.out' op OP_INSERT e=A c=1\n"
+		"unit 'u' before label 't.aggr' op OP_INSERT e=A c=3\n"
+		"unit 'u' before label 't.aggr' op OP_DELETE e=A c=3\n"
+		"unit 'u' before label 't.out' op OP_DELETE e=A c=1\n"
+		"unit 'u' before label 't.aggr' op OP_INSERT e=A c=2\n"
+		"unit 'u' before label 't.aggr' op OP_DELETE e=B c=1\n"
+		"unit 'u' before label 't.out' op OP_DELETE e=B c=1\n"
+		;
+
+	string tlog = trace->getBuffer()->print();
+	if (UT_IS(tlog, expect)) printf("Expected: \"%s\"\n", expect.c_str());
+}
+
+// error detection in MySumAggregatorType
+UTESTCASE aggSumBad(Utest *utest)
+{
+	RowType::FieldVec fld;
+	mkfields(fld);
+
+	Autoref<Unit> unit = new Unit("u");
+
+	Autoref<RowType> rt1 = new CompactRowType(fld);
+	UT_ASSERT(rt1->getErrors().isNull());
+
+	{
+		// there is no need for a primary index, put the aggregation
+		// index(es) as top-level
+		Autoref<TableType> tt = TableType::make(rt1)
+			->addSubIndex("Hashed", HashedIndexType::make( // will be the default index
+					(new NameSet())->add("e")
+				)->addSubIndex("Fifo", FifoIndexType::make()
+					->setAggregator(new MySumAggregatorType("aggr", "z"))
+				)
+			);
+
+		UT_ASSERT(tt);
+		tt->initialize();
+		string msg = tt->getErrors()->print();
+		UT_IS(msg, 
+			"index error:\n"
+			"  nested index 1 'Hashed':\n"
+			"    nested index 1 'Fifo':\n"
+			"      aggregator 'aggr':\n"
+			"        Unknown field 'z' in the row type:\n"
+			"          row {\n"
+			"            uint8[10] a,\n"
+			"            int32[] b,\n"
+			"            int64 c,\n"
+			"            float64 d,\n"
+			"            string e,\n"
+			"          }\n"
+		);
+	}
+	{
+		// there is no need for a primary index, put the aggregation
+		// index(es) as top-level
+		Autoref<TableType> tt = TableType::make(rt1)
+			->addSubIndex("Hashed", HashedIndexType::make( // will be the default index
+					(new NameSet())->add("e")
+				)->addSubIndex("Fifo", FifoIndexType::make()
+					->setAggregator(new MySumAggregatorType("aggr", "a"))
+				)
+			);
+
+		UT_ASSERT(tt);
+		tt->initialize();
+		string msg = tt->getErrors()->print();
+		UT_IS(msg, 
+			"index error:\n"
+			"  nested index 1 'Hashed':\n"
+			"    nested index 1 'Fifo':\n"
+			"      aggregator 'aggr':\n"
+			"        Field 'a' is not an int64 scalar in the row type:\n"
+			"          row {\n"
+			"            uint8[10] a,\n"
+			"            int32[] b,\n"
+			"            int64 c,\n"
+			"            float64 d,\n"
+			"            string e,\n"
+			"          }\n"
+		);
+	}
+}

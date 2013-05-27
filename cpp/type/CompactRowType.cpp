@@ -1,5 +1,5 @@
 //
-// (C) Copyright 2011-2012 Sergey A. Babkin.
+// (C) Copyright 2011-2013 Sergey A. Babkin.
 // This file is a part of Triceps.
 // See the file COPYRIGHT for the copyright notice and license information
 //
@@ -124,6 +124,12 @@ bool CompactRowType::equalRows(const Row *row1, const Row *row2) const
 	if (len1 != cr2->off_[nf])
 		return false;
 	return memcmp(cr1->off_, cr2->off_, len1) == 0;
+}
+
+bool CompactRowType::isRowEmpty(const Row *row) const
+{
+	const CompactRow *cr = static_cast<const CompactRow *>(row);
+	return cr->isRowEmpty((int)fields_.size());
 }
 
 }; // TRICEPS_NS

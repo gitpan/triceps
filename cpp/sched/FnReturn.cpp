@@ -1,5 +1,5 @@
 //
-// (C) Copyright 2011-2012 Sergey A. Babkin.
+// (C) Copyright 2011-2013 Sergey A. Babkin.
 // This file is a part of Triceps.
 // See the file COPYRIGHT for the copyright notice and license information
 //
@@ -8,11 +8,13 @@
 
 #include <sched/FnReturn.h>
 #include <sched/Unit.h>
+#include <app/Facet.h>
 
 namespace TRICEPS_NS {
 
 FnReturn::FnReturn(Unit *unit, const string &name) :
 	unit_(unit),
+	facet_(NULL),
 	name_(name),
 	type_(new RowSetType),
 	initialized_(false)
@@ -37,7 +39,7 @@ const string &FnReturn::getUnitName() const
 	return unit_? unit_->getName() : placeholderUnitName;
 }
 
-FnReturn *FnReturn::addFromLabel(const string &lname, Autoref<Label>from)
+FnReturn *FnReturn::addFromLabel(const string &lname, Autoref<Label>from, bool front)
 {
 	if (initialized_)
 		throw Exception::fTrace("Attempted to add label '%s' to an initialized FnReturn '%s'.", lname.c_str(), name_.c_str());
@@ -55,7 +57,7 @@ FnReturn *FnReturn::addFromLabel(const string &lname, Autoref<Label>from)
 			// type detected no error
 			Autoref<RetLabel> lb = new RetLabel(unit_, rtype, name_ + "." + lname, this, szpre);
 			labels_.push_back(lb);
-			Erref cherr = from->chain(lb);
+			Erref cherr = from->chain(lb, front);
 			if (cherr->hasError())
 				type_->appendErrors()->append("Failed the chaining of label '" + lname + "':", cherr);
 		}
@@ -172,8 +174,8 @@ void FnReturn::pop(Onceref<FnBinding> bind)
 		for (int i = stack_.size()-1; i >= 0; i--)
 			stkerr->appendMsg(true, stack_[i]->getName());
 		Erref err = new Errors;
-		err->appendMsg(true, strprintf("Attempted to pop an unexpected binding '%s' from FnReturn '%s'.", 
-			bind->getName().c_str(), name_.c_str()));
+		err.f("Attempted to pop an unexpected binding '%s' from FnReturn '%s'.", 
+			bind->getName().c_str(), name_.c_str());
 		err->append("The bindings on the stack (top to bottom) are:", stkerr);
 		throw Exception(err, true);
 		// XXX should give some better diagnostics, helping to find the root cause.
@@ -181,6 +183,22 @@ void FnReturn::pop(Onceref<FnBinding> bind)
 	if (!context_.isNull())
 		context_->onPop(this);
 	stack_.pop_back();
+}
+
+void FnReturn::setFacet(Facet *fa)
+{
+	facet_ = fa;
+	if (fa != NULL) {
+		int i;
+
+		i = fa->beginIdx();
+		if (i >= 0 && i < labels_.size())
+			labels_[i]->isBegin_ = true;
+
+		i = fa->endIdx();
+		if (i >= 0 && i < labels_.size())
+			labels_[i]->isEnd_ = true;
+	}
 }
 
 ///////////////////////////////////////////////////////////////////////////
@@ -197,11 +215,41 @@ FnReturn::RetLabel::RetLabel(Unit *unit, const_Onceref<RowType> rtype, const str
 ) :
 	Label(unit, rtype, name),
 	fnret_(fnret),
-	idx_(idx)
+	idx_(idx),
+	isBegin_(false),
+	isEnd_(false)
 { }
 
 void FnReturn::RetLabel::execute(Rowop *arg) const
 {
+	// first see if the cross-nexus procesisng needs to be done
+	{
+		Xtray *xtray = fnret_->xtray_;
+		if (xtray != NULL) { // this means a writer facet
+			if (isBegin_) {
+				if (!xtray->empty()) {
+					// beginning of the next transaction flushes the last transaction
+					fnret_->facet_->flushWriter();
+					if ((xtray = fnret_->xtray_) == NULL)
+						goto done_xtray;
+				}
+				if (!type_->isRowEmpty(arg->getRow()) || arg->getOpcode() != Rowop::OP_INSERT) // add the non-empty _BEGIN_ into the Xtray
+					xtray->push_back(idx_, arg->getRow(), arg->getOpcode());
+			} else if (isEnd_) {
+				if (!type_->isRowEmpty(arg->getRow()) || arg->getOpcode() != Rowop::OP_INSERT) // add the non-empty _END_ into the Xtray
+					xtray->push_back(idx_, arg->getRow(), arg->getOpcode());
+				// flush right away
+				if (!xtray->empty()) {
+					fnret_->facet_->flushWriter();
+				}
+			} else {
+				xtray->push_back(idx_, arg->getRow(), arg->getOpcode());
+			}
+		}
+	}
+done_xtray:
+
+	// then the local processing
 	if (fnret_->stack_.empty())
 		return; // no binding yet
 	FnBinding *top = fnret_->stack_.back();
@@ -280,7 +328,7 @@ void AutoFnBind::clear()
 			rets_[i]->pop(bindings_[i]);
 		} catch (Exception e) {
 			// fprintf(stderr, "DEBUG caught\n");
-			errefAppend(err, strprintf("AutoFnBind::clear: caught an exception at position %d", i), e.getErrors());
+			err.fAppend(e.getErrors(), "AutoFnBind::clear: caught an exception at position %d", i);
 		}
 	}
 	rets_.clear(); bindings_.clear();

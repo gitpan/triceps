@@ -1,5 +1,5 @@
 //
-// (C) Copyright 2011-2012 Sergey A. Babkin.
+// (C) Copyright 2011-2013 Sergey A. Babkin.
 // This file is a part of Triceps.
 // See the file COPYRIGHT for the copyright notice and license information
 //
@@ -19,8 +19,13 @@ RootIndexType::RootIndexType() :
 {
 }
 
-RootIndexType::RootIndexType(const RootIndexType &orig) :
-	IndexType(orig)
+RootIndexType::RootIndexType(const RootIndexType &orig, bool flat) :
+	IndexType(orig, flat)
+{
+}
+
+RootIndexType::RootIndexType(const RootIndexType &orig, HoldRowTypes *holder) :
+	IndexType(orig, holder)
 {
 }
 
@@ -40,9 +45,14 @@ const_Onceref<NameSet> RootIndexType::getKey() const
 	return const_Onceref<NameSet>(); // NULL, no keys
 }
 
-IndexType *RootIndexType::copy() const
+IndexType *RootIndexType::copy(bool flat) const
 {
-	return new RootIndexType(*this);
+	return new RootIndexType(*this, flat);
+}
+
+IndexType *RootIndexType::deepCopy(HoldRowTypes *holder) const
+{
+	return new RootIndexType(*this, holder);
 }
 
 void RootIndexType::initialize()

@@ -24,6 +24,16 @@ WrapRowHandle *	O_WRAP_OBJECT
 WrapAggregatorType *	O_WRAP_OBJECT
 WrapAggregatorContext *	O_WRAP_INVALIDABLE_OBJECT
 
+WrapApp *	O_WRAP_OBJECT
+WrapTrieadOwner *	O_WRAP_OBJECT
+WrapTriead *	O_WRAP_OBJECT
+WrapFacet *	O_WRAP_OBJECT
+WrapNexus *	O_WRAP_OBJECT
+WrapAutoDrain *	O_WRAP_OBJECT
+
+WrapPerlValue *	O_WRAP_OBJECT
+WrapTrackedFile *	O_WRAP_OBJECT
+
 OUTPUT
 # The Perl object is blessed into 'CLASS', which should be a
 # char* having the name of the package for the blessing.
@@ -33,31 +43,31 @@ O_WRAP_OBJECT
 O_WRAP_INVALIDABLE_OBJECT
 	sv_setref_pv( $arg, CLASS, (void*)$var );
 
+# The roundabout way to croak provides the stack trace, like confess().
+# This still doesn't solve the problem with the other code auto-generated
+# by XS, such as for checking the argument count or converting char*,
+# but those are pretty crude errors, and something is better than
+# nothing.
 INPUT
 O_WRAP_OBJECT
 	if( sv_isobject($arg) && (SvTYPE(SvRV($arg)) == SVt_PVMG) ) {
 		$var = ($type)SvIV((SV*)SvRV( $arg ));
 		if ($var == 0 || $var->badMagic()) {
-			setErrMsg( \"${Package}::$func_name(): $var has an incorrect magic for $ntype\" );
-			XSRETURN_UNDEF;
+			croakWithMsg( \"${Package}::$func_name(): $var has an incorrect magic for $ntype\" );
 		}
 	} else{
-		setErrMsg( \"${Package}::$func_name(): $var is not a blessed SV reference to $ntype\" );
-		XSRETURN_UNDEF;
+		croakWithMsg( \"${Package}::$func_name(): $var is not a blessed SV reference to $ntype\" );
 	}
 
 O_WRAP_INVALIDABLE_OBJECT
 	if( sv_isobject($arg) && (SvTYPE(SvRV($arg)) == SVt_PVMG) ) {
 		$var = ($type)SvIV((SV*)SvRV( $arg ));
 		if ($var == 0 || $var->badMagic()) {
-			setErrMsg( \"${Package}::$func_name(): $var has an incorrect magic for $ntype\" );
-			XSRETURN_UNDEF;
+			croakWithMsg( \"${Package}::$func_name(): $var has an incorrect magic for $ntype\" );
 		}
 		if (!$var->isValid()) {
-			setErrMsg( \"${Package}::$func_name(): $var has been already invalidated\" );
-			XSRETURN_UNDEF;
+			croakWithMsg( \"${Package}::$func_name(): $var has been already invalidated\" );
 		}
 	} else{
-		setErrMsg( \"${Package}::$func_name(): $var is not a blessed SV reference to $ntype\" );
-		XSRETURN_UNDEF;
+		croakWithMsg( \"${Package}::$func_name(): $var is not a blessed SV reference to $ntype\" );
 	}

@@ -1,5 +1,5 @@
 //
-// (C) Copyright 2011-2012 Sergey A. Babkin.
+// (C) Copyright 2011-2013 Sergey A. Babkin.
 // This file is a part of Triceps.
 // See the file COPYRIGHT for the copyright notice and license information
 //
@@ -67,6 +67,7 @@ private:
 #else  // } { TRICEPS_NSPR
 
 // the baseline implementation when nothing better is available
+// (it's actually not that bad, I've measured it only about 2.5-3 times slower)
 class AtomicInt
 {
 public:

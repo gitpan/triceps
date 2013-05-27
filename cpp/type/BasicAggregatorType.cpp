@@ -1,5 +1,5 @@
 //
-// (C) Copyright 2011-2012 Sergey A. Babkin.
+// (C) Copyright 2011-2013 Sergey A. Babkin.
 // This file is a part of Triceps.
 // See the file COPYRIGHT for the copyright notice and license information
 //
@@ -18,9 +18,19 @@ BasicAggregatorType::BasicAggregatorType(const string &name, const RowType *rt, 
 	cb_(cb)
 { }
 
+BasicAggregatorType::BasicAggregatorType(const BasicAggregatorType &agg, HoldRowTypes *holder) :
+	AggregatorType(agg, holder),
+	cb_(agg.cb_)
+{ }
+
 AggregatorType *BasicAggregatorType::copy() const
 {
 	return new BasicAggregatorType(*this);
+}
+
+AggregatorType *BasicAggregatorType::deepCopy(HoldRowTypes *holder) const
+{
+	return new BasicAggregatorType(*this, holder);
 }
 
 bool BasicAggregatorType::equals(const Type *t) const
@@ -62,7 +72,7 @@ AggregatorGadget *BasicAggregatorType::makeGadget(Table *table, IndexType *intyp
 
 Aggregator *BasicAggregatorType::makeAggregator(Table *table, AggregatorGadget *gadget) const
 {
-	return new BasicAggregator(table, gadget);
+	return new BasicAggregator;
 }
 
 }; // TRICEPS_NS

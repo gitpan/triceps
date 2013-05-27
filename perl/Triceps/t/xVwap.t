@@ -1,5 +1,5 @@
 #
-# (C) Copyright 2011-2012 Sergey A. Babkin.
+# (C) Copyright 2011-2013 Sergey A. Babkin.
 # This file is a part of Triceps.
 # See the file COPYRIGHT for the copyright notice and license information
 #
@@ -15,7 +15,7 @@
 use ExtUtils::testlib;
 
 use Test;
-BEGIN { plan tests => 20 };
+BEGIN { plan tests => 18 };
 use Triceps;
 use Triceps::X::TestFeed qw(:all);
 use Carp;
@@ -162,7 +162,7 @@ ok(ref $tAggr1, "Triceps::Table");
 # the label that processes the results of aggregation
 $resLabel1 = $vu1->makeLabel($rtVwap, "collect", undef, \&collectOutput);
 ok(ref $resLabel1, "Triceps::Label");
-ok($tAggr1->getAggregatorLabel("aggrVwap")->chain($resLabel1));
+$tAggr1->getAggregatorLabel("aggrVwap")->chain($resLabel1);
 
 # now reset the output and feed the input
 @resultData = ();
@@ -178,6 +178,8 @@ ok(&dataToString(@resultData), &dataToString(@expectResultData));
 ############################# vwap package ####################################
 # XXX it's not good at error checking... something needs to be done...
 package vwap2;
+
+sub CLONE_SKIP { 1; }
 
 # aggregation handler: recalculate it each time the easy way
 sub vwapHandler # (table, context, aggop, opcode, rh, state, self)
@@ -336,7 +338,7 @@ ok(ref $vwapper2, "vwap2");
 # the label that processes the results of aggregation
 $resLabel2 = $vu2->makeLabel($vwapper2->getOutputRowType(), "collect", undef, \&collectOutput);
 ok(ref $resLabel2, "Triceps::Label");
-ok($vwapper2->getOutputLabel()->chain($resLabel2));
+$vwapper2->getOutputLabel()->chain($resLabel2);
 
 # now reset the output and feed the input
 @resultData = ();
@@ -416,8 +418,7 @@ my $lbPrint = $uTrades->makeLabel($rtVwap, "lbPrint",
 	undef, sub { # (label, rowop)
 		&send($_[1]->printP(), "\n");
 	}) or confess "$!";
-$tWindow->getAggregatorLabel("aggrVwap")->chain($lbPrint)
-	or confess "$!";
+$tWindow->getAggregatorLabel("aggrVwap")->chain($lbPrint);
 
 while(&readLine) {
 	chomp;

@@ -1,17 +1,12 @@
 #
-# (C) Copyright 2011-2012 Sergey A. Babkin.
+# (C) Copyright 2011-2013 Sergey A. Babkin.
 # This file is a part of Triceps.
 # See the file COPYRIGHT for the copyright notice and license information
 #
 # An example of traffic accounting aggregated to multiple levels,
 # with "freezing" and cleaning of old detailed data.
 
-# Before `make install' is performed this script should be runnable with
-# `make test'. After `make install' it should work as `perl Triceps.t'
-
 #########################
-
-# change 'tests => 1' to 'tests => last_test_to_print';
 
 use ExtUtils::testlib;
 
@@ -141,8 +136,7 @@ our $tHourly = $uTraffic->makeTable($ttHourly,
 	&Triceps::EM_CALL, "tHourly") or confess "$!";
 
 # connect the tables
-$tPackets->getAggregatorLabel("aggrHourly")->chain($tHourly->getInputLabel()) 
-	or confess "$!";
+$tPackets->getAggregatorLabel("aggrHourly")->chain($tHourly->getInputLabel());
 
 # label to print the changes to the detailed stats
 makePrintLabel("lbPrintPackets", $tPackets->getOutputLabel());
@@ -413,8 +407,7 @@ our $tDaily = $uTraffic->makeTable($ttDaily,
 	&Triceps::EM_CALL, "tDaily") or confess "$!";
 
 # connect the tables (but not the daily one)
-$tPackets->getAggregatorLabel("aggrHourly")->chain($tHourly->getInputLabel()) 
-	or confess "$!";
+$tPackets->getAggregatorLabel("aggrHourly")->chain($tHourly->getInputLabel());
 
 # reuse the same sub makePrintLabel
 

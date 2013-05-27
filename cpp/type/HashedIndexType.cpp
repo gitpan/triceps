@@ -1,5 +1,5 @@
 //
-// (C) Copyright 2011-2012 Sergey A. Babkin.
+// (C) Copyright 2011-2013 Sergey A. Babkin.
 // This file is a part of Triceps.
 // See the file COPYRIGHT for the copyright notice and license information
 //
@@ -22,6 +22,17 @@ HashedIndexType::Less::Less(const RowType *rt, intptr_t rhOffset, const vector<i
 	keyFld_(keyFld),
 	rhOffset_(rhOffset)
 { }
+
+HashedIndexType::Less::Less(const Less *other, Table *t) :
+	TreeIndexType::Less(other, t),
+	keyFld_(other->keyFld_),
+	rhOffset_(other->rhOffset_)
+{ }
+
+TreeIndexType::Less *HashedIndexType::Less::tableCopy(Table *t) const
+{
+	return new Less(this, t);
+}
 
 bool HashedIndexType::Less::operator() (const RowHandle *r1, const RowHandle *r2) const 
 {
@@ -83,8 +94,16 @@ HashedIndexType::HashedIndexType(NameSet *key) :
 {
 }
 
-HashedIndexType::HashedIndexType(const HashedIndexType &orig) :
-	TreeIndexType(orig)
+HashedIndexType::HashedIndexType(const HashedIndexType &orig, bool flat) :
+	TreeIndexType(orig, flat)
+{
+	if (!orig.key_.isNull()) {
+		key_ = new NameSet(*orig.key_);
+	}
+}
+
+HashedIndexType::HashedIndexType(const HashedIndexType &orig, HoldRowTypes *holder) :
+	TreeIndexType(orig, holder)
 {
 	if (!orig.key_.isNull()) {
 		key_ = new NameSet(*orig.key_);
@@ -199,9 +218,14 @@ void HashedIndexType::printTo(string &res, const string &indent, const string &s
 	printSubelementsTo(res, indent, subindent);
 }
 
-IndexType *HashedIndexType::copy() const
+IndexType *HashedIndexType::copy(bool flat) const
 {
-	return new HashedIndexType(*this);
+	return new HashedIndexType(*this, flat);
+}
+
+IndexType *HashedIndexType::deepCopy(HoldRowTypes *holder) const
+{
+	return new HashedIndexType(*this, holder);
 }
 
 void HashedIndexType::initialize()
@@ -221,7 +245,7 @@ void HashedIndexType::initialize()
 	for (int i = 0; i < n; i++) {
 		int idx = rt->findIdx((*key_)[i]);
 		if (idx < 0) {
-			errors_->appendMsg(true, strprintf("can not find the key field '%s'", (*key_)[i].c_str()));
+			errors_.f("can not find the key field '%s'", (*key_)[i].c_str());
 		}
 		keyFld_[i] = idx;
 	}
@@ -235,6 +259,8 @@ Index *HashedIndexType::makeIndex(const TableType *tabtype, Table *table) const
 	if (!isInitialized() 
 	|| errors_->hasError())
 		return NULL; 
+	// no need to report the errors, so can just use the same less_,
+	// without creating a copy with the table pointer
 	if (nested_.empty())
 		return new TreeIndex(tabtype, table, this, less_);
 	else

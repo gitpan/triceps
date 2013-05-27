@@ -1,5 +1,5 @@
 //
-// (C) Copyright 2011-2012 Sergey A. Babkin.
+// (C) Copyright 2011-2013 Sergey A. Babkin.
 // This file is a part of Triceps.
 // See the file COPYRIGHT for the copyright notice and license information
 //
@@ -12,9 +12,17 @@
 #include "ppport.h"
 
 #include "TricepsPerl.h"
+#include <type/HoldRowTypes.h>
 
 MODULE = Triceps::TableType		PACKAGE = Triceps::TableType
 ###################################################################################
+
+int
+CLONE_SKIP(...)
+	CODE:
+		RETVAL = 1;
+	OUTPUT:
+		RETVAL
 
 void
 DESTROY(WrapTableType *self)
@@ -31,17 +39,15 @@ Triceps::TableType::new(WrapRowType *wrt)
 	OUTPUT:
 		RETVAL
 
-# XXX add copy()?
-
-# print(self, [ indent, [ subindent ] ])
-#   indent - default "", undef means "print everything in a signle line"
-#   subindent - default "  "
+#// print(self, [ indent, [ subindent ] ])
+#//   indent - default "", undef means "print everything in a signle line"
+#//   subindent - default "  "
 SV *
 print(WrapTableType *self, ...)
 	PPCODE:
 		GEN_PRINT_METHOD(TableType)
 
-# type comparisons
+#// type comparisons
 int
 equals(WrapTableType *self, WrapTableType *other)
 	CODE:
@@ -72,8 +78,8 @@ same(WrapTableType *self, WrapTableType *other)
 	OUTPUT:
 		RETVAL
 
-# add an index
-# XXX accept multiple subname-sub pairs as arguments
+#// add an index
+#// XXX accept multiple subname-sub pairs as arguments
 WrapTableType *
 addSubIndex(WrapTableType *self, char *subname, WrapIndexType *sub)
 	CODE:
@@ -95,7 +101,7 @@ addSubIndex(WrapTableType *self, char *subname, WrapIndexType *sub)
 	OUTPUT:
 		RETVAL
 
-# find a nested index by name
+#// find a nested index by name
 WrapIndexType *
 findSubIndex(WrapTableType *self, char *subname)
 	CODE:
@@ -114,7 +120,7 @@ findSubIndex(WrapTableType *self, char *subname)
 	OUTPUT:
 		RETVAL
 
-# find a nested index by type id
+#// find a nested index by type id
 WrapIndexType *
 findSubIndexById(WrapTableType *self, SV *idarg)
 	CODE:
@@ -138,7 +144,7 @@ findSubIndexById(WrapTableType *self, SV *idarg)
 	OUTPUT:
 		RETVAL
 
-# returns an array of paired values (name => type)
+#// returns an array of paired values (name => type)
 SV *
 getSubIndexes(WrapTableType *self)
 	PPCODE:
@@ -158,7 +164,7 @@ getSubIndexes(WrapTableType *self)
 			XPUSHs(sv_2mortal(sub));
 		}
 
-# get the first leaf sub-index
+#// get the first leaf sub-index
 WrapIndexType *
 getFirstLeaf(WrapTableType *self)
 	CODE:
@@ -177,7 +183,7 @@ getFirstLeaf(WrapTableType *self)
 	OUTPUT:
 		RETVAL
 
-# check if the type has been initialized
+#// check if the type has been initialized
 int
 isInitialized(WrapTableType *self)
 	CODE:
@@ -187,7 +193,7 @@ isInitialized(WrapTableType *self)
 	OUTPUT:
 		RETVAL
 
-# initialize, returns 1 on success, undef on error
+#// initialize, returns 1 on success, undef on error
 int
 initialize(WrapTableType *self)
 	CODE:
@@ -203,7 +209,7 @@ initialize(WrapTableType *self)
 	OUTPUT:
 		RETVAL
 
-# get back the row type
+#// get back the row type
 WrapRowType *
 rowType(WrapTableType *self)
 	CODE:
@@ -216,7 +222,7 @@ rowType(WrapTableType *self)
 	OUTPUT:
 		RETVAL
 
-# get back the row type, with a consistent name
+#// get back the row type, with a consistent name
 WrapRowType *
 getRowType(WrapTableType *self)
 	CODE:
@@ -229,3 +235,29 @@ getRowType(WrapTableType *self)
 	OUTPUT:
 		RETVAL
 
+#// copy the row type, the result is un-initialized
+WrapTableType *
+copy(WrapTableType *self)
+	CODE:
+		// for casting of return value
+		static char CLASS[] = "Triceps::TableType";
+
+		clearErrMsg();
+		TableType *tbt = self->get();
+		RETVAL = new WrapTableType(tbt->copy());
+	OUTPUT:
+		RETVAL
+
+#// this one is exported to Perl for testing, and thus left undocumented
+WrapTableType *
+deepCopy(WrapTableType *self)
+	CODE:
+		// for casting of return value
+		static char CLASS[] = "Triceps::TableType";
+
+		clearErrMsg();
+		TableType *tbt = self->get();
+		Autoref<HoldRowTypes> holder = new HoldRowTypes;
+		RETVAL = new WrapTableType(tbt->deepCopy(holder));
+	OUTPUT:
+		RETVAL

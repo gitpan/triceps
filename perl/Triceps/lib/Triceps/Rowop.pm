@@ -1,5 +1,5 @@
 #
-# (C) Copyright 2011-2012 Sergey A. Babkin.
+# (C) Copyright 2011-2013 Sergey A. Babkin.
 # This file is a part of Triceps.
 # See the file COPYRIGHT for the copyright notice and license information
 #
@@ -7,15 +7,19 @@
 
 package Triceps::Rowop;
 
-our $VERSION = 'v1.0.91';
+our $VERSION = 'v1.0.92';
 
 # convert a rowop to a printable string, with name-value pairs
 # (printP stands for "print in Perl")
 package  Triceps::Rowop;
-sub printP # ($self)
+
+# @param name - override for the name of the label
+sub printP # ($self, [$name])
 {
 	my $self = shift;
-	return $self->getLabel()->getName() . " " . Triceps::opcodeString($self->getOpcode()) . " " . $self->getRow()->printP();
+	my $name = shift;
+	$name = $self->getLabel()->getName() unless ($name);
+	return $name . " " . Triceps::opcodeString($self->getOpcode()) . " " . $self->getRow()->printP();
 }
 
 1;

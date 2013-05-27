@@ -1,5 +1,5 @@
 //
-// (C) Copyright 2011-2012 Sergey A. Babkin.
+// (C) Copyright 2011-2013 Sergey A. Babkin.
 // This file is a part of Triceps.
 // See the file COPYRIGHT for the copyright notice and license information
 //
@@ -31,8 +31,15 @@ WrapMagic magicWrapAggregatorContext = { "AggCtx" };
 MODULE = Triceps::AggregatorContext		PACKAGE = Triceps::AggregatorContext
 ###################################################################################
 
-# can not use the common typemap, because the destruction can be legally
-# called on an invalidated object, which would not pass the typemap
+int
+CLONE_SKIP(...)
+	CODE:
+		RETVAL = 1;
+	OUTPUT:
+		RETVAL
+
+#// can not use the common typemap, because the destruction can be legally
+#// called on an invalidated object, which would not pass the typemap
 void
 DESTROY(SV *selfsv)
 	CODE:
@@ -51,7 +58,7 @@ DESTROY(SV *selfsv)
 		// warn("AggregatorContext %p destroyed!", self);
 		delete self;
 
-# get the number of rows in the group
+#// get the number of rows in the group
 int
 groupSize(WrapAggregatorContext *self)
 	CODE:
@@ -60,7 +67,7 @@ groupSize(WrapAggregatorContext *self)
 	OUTPUT:
 		RETVAL
 
-# get the row type of the result
+#// get the row type of the result
 WrapRowType *
 resultType(WrapAggregatorContext *self)
 	CODE:
@@ -73,8 +80,8 @@ resultType(WrapAggregatorContext *self)
 		RETVAL
 
 
-# iteration on the group
-# RowHandle with NULL pointer in it is used for the end-iterator
+#// iteration on the group
+#// RowHandle with NULL pointer in it is used for the end-iterator
 
 WrapRowHandle *
 begin(WrapAggregatorContext *self)
@@ -123,8 +130,8 @@ last(WrapAggregatorContext *self)
 	OUTPUT:
 		RETVAL
 		
-# translation to the group in another index: can be done in Perl
-# but more efficient and easier to push it into C++
+#// translation to the group in another index: can be done in Perl
+#// but more efficient and easier to push it into C++
 WrapRowHandle *
 beginIdx(WrapAggregatorContext *self, WrapIndexType *widx)
 	CODE:
@@ -152,8 +159,8 @@ beginIdx(WrapAggregatorContext *self, WrapIndexType *widx)
 	OUTPUT:
 		RETVAL
 
-# translation to the group in another index: can be done in Perl
-# but more efficient and easier to push it into C++
+#// translation to the group in another index: can be done in Perl
+#// but more efficient and easier to push it into C++
 WrapRowHandle *
 endIdx(WrapAggregatorContext *self, WrapIndexType *widx)
 	CODE:
@@ -181,8 +188,8 @@ endIdx(WrapAggregatorContext *self, WrapIndexType *widx)
 	OUTPUT:
 		RETVAL
 
-# translation to the group in another index: can be done in Perl
-# but more efficient and easier to push it into C++
+#// translation to the group in another index: can be done in Perl
+#// but more efficient and easier to push it into C++
 WrapRowHandle *
 lastIdx(WrapAggregatorContext *self, WrapIndexType *widx)
 	CODE:
@@ -210,8 +217,8 @@ lastIdx(WrapAggregatorContext *self, WrapIndexType *widx)
 	OUTPUT:
 		RETVAL
 
-# returns 1 on success, undef on error;
-# enqueueing mode is taken from the aggregator gadget
+#// returns 1 on success, undef on error;
+#// enqueueing mode is taken from the aggregator gadget
 int
 send(WrapAggregatorContext *self, SV *opcode, WrapRow *row)
 	CODE:

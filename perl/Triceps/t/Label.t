@@ -1,5 +1,5 @@
 #
-# (C) Copyright 2011-2012 Sergey A. Babkin.
+# (C) Copyright 2011-2013 Sergey A. Babkin.
 # This file is a part of Triceps.
 # See the file COPYRIGHT for the copyright notice and license information
 #
@@ -15,7 +15,7 @@
 use ExtUtils::testlib;
 
 use Test;
-BEGIN { plan tests => 53 };
+BEGIN { plan tests => 63 };
 use Triceps;
 ok(1); # If we made it this far, we're ok.
 
@@ -102,7 +102,6 @@ ok($#chain, -1);
 # but here it doesn't matter
 $res = $lb->chain($t1->getInputLabel());
 ok($res);
-ok($! . "", "");
 
 $res = $lb->hasChained();
 ok($res, 1);
@@ -114,19 +113,41 @@ ok($v);
 # yes, the same chaining can be repeated!
 $res = $lb->chain($t1->getInputLabel());
 ok($res);
-ok($! . "", "");
 
 @chain = $lb->getChain();
 ok(join(", ", map {$_->getName()} @chain), "tab1.in, tab1.in");
 
 # incorrect chaining
-$res = $lb->chain($lb);
-ok(! defined $res);
-ok($! . "", "Triceps::Label::chain: labels must not be chained in a loop\n  xxx_tab1.out->xxx_tab1.out");
+eval { $lb->chain($lb); };
+ok($@, qr/^Triceps::Label::chain: failed\n  labels must not be chained in a loop\n    xxx_tab1.out->xxx_tab1.out/);
 
 # see that it's unchanged
 @chain = $lb->getChain();
 ok(join(", ", map {$_->getName()} @chain), "tab1.in, tab1.in");
+
+# clear the chaining
+$lb->clearChained();
+@chain = $lb->getChain();
+ok($#chain, -1);
+
+######################### chainFront ##################################
+
+$res = $lb->chainFront($t1->getInputLabel());
+ok($res);
+
+$res = $lb->chainFront($t1->getPreLabel());
+ok($res);
+
+@chain = $lb->getChain();
+ok(join(", ", map {$_->getName()} @chain), "tab1.pre, tab1.in");
+
+# incorrect chaining
+eval { $lb->chainFront($lb); };
+ok($@, qr/^Triceps::Label::chainFront: failed\n  labels must not be chained in a loop\n    xxx_tab1.out->xxx_tab1.out/);
+
+# see that it's unchanged
+@chain = $lb->getChain();
+ok(join(", ", map {$_->getName()} @chain), "tab1.pre, tab1.in");
 
 # clear the chaining
 $lb->clearChained();
@@ -156,18 +177,17 @@ ok($res, \&plab_exec);
 
 ok(!$plab->isCleared());
 $plab->clear();
-ok($! . "", "");
 ok($plab->isCleared());
 
-$res = $lb->getCode();
-ok(! defined $res);
-ok($! . "", "Triceps::Label::getCode: label is not a Perl Label, has no Perl code");
+eval { $res = $lb->getCode(); };
+ok($@, qr/^Triceps::Label::getCode: label is not a Perl Label, has no Perl code/);
 
 $lb->clear(); # even a non-Perl label can be cleared
-ok($! . "", "");
 
 # clearing of the objects by the default Triceps::clearArgs
 package ttt;
+
+sub CLONE_SKIP { 1; }
 
 sub new
 {
@@ -189,7 +209,6 @@ package main;
 	ok(ref $plab, "Triceps::Label");
 
 	$plab->clear();
-	ok($! . "", "");
 
 	# the undefuned clearSub equals to clearArgs() which will wipe out the object
 	ok(!exists $tcopy->{a});
@@ -210,9 +229,50 @@ package main;
 	ok($clab->getName(), "clab");
 
 	$clab->clear();
-	ok($! . "", "");
 
 	# clearing calls clearArgs() which will wipe out the object
 	ok(!exists $tcopy->{a});
+}
+
+######################### makeChained ###################################
+
+{
+	my $res;
+	my $olb = $u1->makeDummyLabel($rt1, "lbOrig");
+	ok(ref $olb, "Triceps::Label");
+	my $clb = $olb->makeChained("lbChained", sub {
+		$res = "cleared";
+	} , sub {
+		my $label = shift;
+		my $rowop = shift;
+		$res .= $rowop->printP();
+		$res .= sprintf("\nArgs: %s\n", join(' ', @_));
+	}, 1, 2, 3);
+	ok(ref $clb, "Triceps::Label");
+
+	@chain = $olb->getChain();
+	ok($#chain, 0);
+	ok($clb->same($chain[0]));
+
+	$u1->makeHashCall($olb, "OP_INSERT", b => 1);
+	ok($res, "lbOrig OP_INSERT b=\"1\" \nArgs: 1 2 3\n");
+
+	$clb->clear();
+	ok($res, "cleared");
+
+	# test errors
+	ok(!defined eval {
+		$olb->makeChained("lbChained", 1, 2);
+	});
+	ok($@, qr/^Triceps::Unit::makeLabel\(clear\): code must be a reference to Perl function/);
+	ok(!defined eval {
+		$olb->makeChained("lbChained", undef);
+	});
+	ok($@, qr/^Use: Label::makeChained\(self, name, clear, exec, ...\)/);
+	ok(!defined eval {
+		$olb->clear();
+		$olb->makeChained("lbChained", undef, undef);
+	});
+	ok($@, qr/^Triceps::Label::getUnit: label has been already cleared at \S+ line \d+\n\tTriceps::Label::makeChained/);
 }
 

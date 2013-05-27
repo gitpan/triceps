@@ -1,5 +1,5 @@
 #
-# (C) Copyright 2011-2012 Sergey A. Babkin.
+# (C) Copyright 2011-2013 Sergey A. Babkin.
 # This file is a part of Triceps.
 # See the file COPYRIGHT for the copyright notice and license information
 #
@@ -161,6 +161,9 @@ Unknown command 'goodbye'
 # An example of a wrapper over the table class
 
 package MyTable;
+
+sub CLONE_SKIP { 1; }
+
 our @ISA = qw(Triceps::Table);
 
 sub new # (class, unit, args of makeTable...)
@@ -220,7 +223,7 @@ sub helloWorldLabels()
 			&send(&Triceps::opcodeString($rowop->getOpcode), " '", 
 				$row->get("address"), "', count ", $row->get("count"), "\n");
 		} ) or confess "$!";
-	$tCount->getOutputLabel()->chain($lbPrintCount) or confess "$!";
+	$tCount->getOutputLabel()->chain($lbPrintCount);
 
 	# the updates will be sent here, for the tables to process
 	my $lbTableInput = $tCount->getInputLabel();

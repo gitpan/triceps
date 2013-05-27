@@ -1,5 +1,5 @@
 //
-// (C) Copyright 2011-2012 Sergey A. Babkin.
+// (C) Copyright 2011-2013 Sergey A. Babkin.
 // This file is a part of Triceps.
 // See the file COPYRIGHT for the copyright notice and license information
 //
@@ -31,6 +31,7 @@ public:
 	virtual void destroyRow(Row *row) const;
 	virtual void hexdumpRow(string &dest, const Row *row, const string &indent="") const;
 	virtual bool equalRows(const Row *row1, const Row *row2) const;
+	virtual bool isRowEmpty(const Row *row) const;
 };
 
 }; // TRICEPS_NS

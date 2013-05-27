@@ -1,5 +1,5 @@
 //
-// (C) Copyright 2011-2012 Sergey A. Babkin.
+// (C) Copyright 2011-2013 Sergey A. Babkin.
 // This file is a part of Triceps.
 // See the file COPYRIGHT for the copyright notice and license information
 //
@@ -26,6 +26,9 @@ Table::InputLabel::InputLabel(Unit *unit, const_Onceref<RowType> rtype, const st
 
 void Table::InputLabel::execute(Rowop *arg) const
 {
+	if (table_ == NULL)
+		throw Exception::f("Can not send more input to a destroyed table");
+
 	if (arg->isInsert()) {
 		table_->insertRow(arg->getRow()); // ignore the failures
 	} else if (arg->isDelete()) {
@@ -61,6 +64,8 @@ Table::Table(Unit *unit, EnqMode emode, const string &name,
 Table::~Table()
 {
 	// fprintf(stderr, "DEBUG Table::~Table root=%p\n", root_.get());
+
+	inputLabel_->resetTable(); // prevent it from sending more data
 
 	// remove all the rows in the table: this goes more efficiently
 	// if we first move them to a vector, clear the indexes and delete from vector;
@@ -152,6 +157,8 @@ bool Table::insertRow(const Row *row)
 
 bool Table::insert(RowHandle *newrh)
 {
+	checkStickyError();
+
 	if (newrh == NULL)
 		return false;
 
@@ -159,7 +166,7 @@ bool Table::insert(RowHandle *newrh)
 		return false;  // nothing to do
 
 	if (busy_)
-		throw Exception(strprintf("Detected a recursive modification of the table '%s'.", getName().c_str()), false);
+		throw Exception::fTrace("Detected a recursive modification of the table '%s'.", getName().c_str());
 
 	BusyMark bm(busy_); // will auto-clean on exit
 
@@ -251,17 +258,20 @@ bool Table::insert(RowHandle *newrh)
 		// XXX this leaves the empty groups uncollapsed
 		throw;
 	}
+	checkStickyErrorAfter();
 	
 	return true;
 }
 
 void Table::remove(RowHandle *rh)
 {
+	checkStickyError();
+
 	if (rh == NULL || !rh->isInTable())
 		return;
 
 	if (busy_)
-		throw Exception(strprintf("Detected a recursive modification of the table '%s'.", getName().c_str()), false);
+		throw Exception::fTrace("Detected a recursive modification of the table '%s'.", getName().c_str());
 
 	BusyMark bm(busy_); // will auto-clean on exit
 
@@ -322,6 +332,7 @@ void Table::remove(RowHandle *rh)
 		// XXX this leaves the empty groups uncollapsed
 		throw;
 	}
+	checkStickyErrorAfter();
 }
 
 bool Table::deleteRow(const Row *row)
@@ -337,11 +348,15 @@ bool Table::deleteRow(const Row *row)
 
 RowHandle *Table::begin() const
 {
+	checkStickyError();
+
 	return root_->begin();
 }
 
 RowHandle *Table::beginIdx(IndexType *ixt) const
 {
+	checkStickyError();
+
 	if (ixt == NULL || ixt->getTabtype() != type_)
 		return NULL;
 
@@ -350,11 +365,14 @@ RowHandle *Table::beginIdx(IndexType *ixt) const
 
 RowHandle *Table::next(const RowHandle *cur) const
 {
+	checkStickyError();
 	return root_->next(cur);
 }
 
 RowHandle *Table::nextIdx(IndexType *ixt, const RowHandle *cur) const
 {
+	checkStickyError();
+
 	if (ixt == NULL || ixt->getTabtype() != type_ || cur == NULL || !cur->isInTable())
 		return NULL;
 
@@ -363,22 +381,32 @@ RowHandle *Table::nextIdx(IndexType *ixt, const RowHandle *cur) const
 
 RowHandle *Table::firstOfGroupIdx(IndexType *ixt, const RowHandle *cur) const
 {
+	checkStickyError();
+
 	if (ixt == NULL || ixt->getTabtype() != type_ || cur == NULL || !cur->isInTable())
 		return NULL;
 
-	return ixt->firstOfGroupIdx(this, cur);
+	RowHandle *res = ixt->firstOfGroupIdx(this, cur);
+	checkStickyErrorAfter();
+	return res;
 }
 
 RowHandle *Table::nextGroupIdx(IndexType *ixt, const RowHandle *cur) const
 {
+	checkStickyError();
+
 	if (ixt == NULL || ixt->getTabtype() != type_ || cur == NULL || !cur->isInTable())
 		return NULL;
 
-	return ixt->nextGroupIdx(this, cur);
+	RowHandle *res = ixt->nextGroupIdx(this, cur);
+	checkStickyErrorAfter();
+	return res;
 }
 
 RowHandle *Table::lastOfGroupIdx(IndexType *ixt, const RowHandle *cur) const
 {
+	checkStickyError();
+
 	if (ixt == NULL || ixt->getTabtype() != type_ || cur == NULL || !cur->isInTable())
 		return NULL;
 
@@ -387,10 +415,14 @@ RowHandle *Table::lastOfGroupIdx(IndexType *ixt, const RowHandle *cur) const
 
 RowHandle *Table::findIdx(IndexType *ixt, const RowHandle *what) const
 {
+	checkStickyError();
+
 	if (ixt == NULL || ixt->getTabtype() != type_)
 		return NULL;
 
-	return ixt->findRecord(this, what);
+	RowHandle *res = ixt->findRecord(this, what);
+	checkStickyErrorAfter();
+	return res;
 }
 
 RowHandle *Table::findRowIdx(IndexType *ixt, const Row *row) const
@@ -401,16 +433,25 @@ RowHandle *Table::findRowIdx(IndexType *ixt, const Row *row) const
 	RowHandle *rh = makeRowHandle(row);
 	rh->incref();
 
-	RowHandle *res = findIdx(ixt, rh);
+	RowHandle *res;
+
+	try {
+		res = findIdx(ixt, rh);
+	} catch (Exception e) {
+		if (rh->decref() <= 0)
+			destroyRowHandle(rh);
+		throw;
+	}
 
 	if (rh->decref() <= 0)
 		destroyRowHandle(rh);
-
 	return res;
 }
 
 size_t Table::groupSizeIdx(IndexType *ixt, const RowHandle *what) const
 {
+	checkStickyError();
+
 	if (ixt == NULL || ixt->getTabtype() != type_)
 		return 0;
 
@@ -425,7 +466,15 @@ size_t Table::groupSizeRowIdx(IndexType *ixt, const Row *row) const
 	RowHandle *rh = makeRowHandle(row);
 	rh->incref();
 
-	size_t res = groupSizeIdx(ixt, rh);
+	size_t res ;
+
+	try {
+		res = groupSizeIdx(ixt, rh);
+	} catch (Exception e) {
+		if (rh->decref() <= 0)
+			destroyRowHandle(rh);
+		throw;
+	}
 
 	if (rh->decref() <= 0)
 		destroyRowHandle(rh);
@@ -455,6 +504,25 @@ void Table::dumpAllIdx(IndexType *ixt, Rowop::Opcode op) const
 		ixt = firstLeaf_;
 	for (RowHandle *rh = beginIdx(ixt); rh != NULL; rh = nextIdx(ixt, rh))
 		unit_->call(new Rowop(dumpLabel_, op, rh->getRow()));
+}
+
+void Table::setStickyError(Erref err)
+{
+	if (stickyErr_.isNull())
+		stickyErr_ = err;
+}
+
+void Table::checkStickyError() const
+{
+	if (!stickyErr_.isNull())
+		throw Exception::fTrace(stickyErr_, "Table is disabled due to the previous error:");
+}
+
+void Table::checkStickyErrorAfter() const
+{
+	if (!stickyErr_.isNull()) {
+		throw Exception(stickyErr_, true);
+	}
 }
 
 }; // TRICEPS_NS

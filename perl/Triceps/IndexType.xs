@@ -1,5 +1,5 @@
 //
-// (C) Copyright 2011-2012 Sergey A. Babkin.
+// (C) Copyright 2011-2013 Sergey A. Babkin.
 // This file is a part of Triceps.
 // See the file COPYRIGHT for the copyright notice and license information
 //
@@ -19,6 +19,13 @@
 MODULE = Triceps::IndexType		PACKAGE = Triceps::IndexType
 ###################################################################################
 
+int
+CLONE_SKIP(...)
+	CODE:
+		RETVAL = 1;
+	OUTPUT:
+		RETVAL
+
 void
 DESTROY(WrapIndexType *self)
 	CODE:
@@ -26,8 +33,8 @@ DESTROY(WrapIndexType *self)
 		delete self;
 
 
-# create a HashedIndex
-# options go in pairs  name => value 
+#// create a HashedIndex
+#// options go in pairs  name => value 
 WrapIndexType *
 newHashed(char *CLASS, ...)
 	CODE:
@@ -66,8 +73,8 @@ newHashed(char *CLASS, ...)
 	OUTPUT:
 		RETVAL
 
-# create a FifoIndex
-# options go in pairs  name => value 
+#// create a FifoIndex
+#// options go in pairs  name => value 
 WrapIndexType *
 newFifo(char *CLASS, ...)
 	CODE:
@@ -101,25 +108,26 @@ newFifo(char *CLASS, ...)
 	OUTPUT:
 		RETVAL
 
-# create a PerlSortedIndex
-# that uses a Perl comparison function
-# @param CLASS - name of type being constructed
-# @param sortName - name of the sort condition (for messages about comparator fatal errors)
-# @param initialize - function reference used to perform the index type initialization,
-#        may be undef if the compare argument is defined, may be
-#        used to check that the args make sense and generate the compare callback on the fly.
-#        Args: TableType tabt, IndexType idxt, RowType rowt
-#          tabt - table type that performs the initialization
-#          idxt - link back to the index type that contains the condition (used to
-#                 set the compare callback and such)
-#          rowt - row type of the table, passed directly as a convenience
-#        Returns undef on success or an error message (may freely contain \n) on error.
-# @param compare - function reference used to compare the keys for the sorting order,
-#        may be undef if the initialize argument is defined and will use setComparator()
-#        at initialization time, having it still undefined after initialization is an error..
-#        Args: Row r1, Row r2.
-#        Returns the result of r1 <=> r2.
-# @param ... - extra args used for both initialize and compare functions
+#// create a PerlSortedIndex
+#// that uses a Perl comparison function
+#// @param CLASS - name of type being constructed
+#// @param sortName - name of the sort condition (for messages about comparator fatal errors)
+#//        XXX now with the source-code comparators could use them?
+#// @param initialize - function reference used to perform the index type initialization,
+#//        may be undef if the compare argument is defined, may be
+#//        used to check that the args make sense and generate the compare callback on the fly.
+#//        Args: TableType tabt, IndexType idxt, RowType rowt
+#//          tabt - table type that performs the initialization
+#//          idxt - link back to the index type that contains the condition (used to
+#//                 set the compare callback and such)
+#//          rowt - row type of the table, passed directly as a convenience
+#//        Returns undef on success or an error message (may freely contain \n) on error.
+#// @param compare - function reference used to compare the keys for the sorting order,
+#//        may be undef if the initialize argument is defined and will use setComparator()
+#//        at initialization time, having it still undefined after initialization is an error..
+#//        Args: Row r1, Row r2.
+#//        Returns the result of r1 <=> r2.
+#// @param ... - extra args used for both initialize and compare functions
 WrapIndexType *
 newPerlSorted(char *CLASS, char *sortName, SV *initialize, SV *compare, ...)
 	CODE:
@@ -128,7 +136,7 @@ newPerlSorted(char *CLASS, char *sortName, SV *initialize, SV *compare, ...)
 
 		Onceref<PerlCallback> cbInit; // defaults to NULL
 		if (SvOK(initialize)) {
-			cbInit = new PerlCallback();
+			cbInit = new PerlCallback(true);
 			PerlCallbackInitializeSplit(cbInit, "Triceps::IndexType::newPerlSorted(initialize)", initialize, 4, items-4);
 			if (cbInit->code_ == NULL)
 				XSRETURN_UNDEF; // error message is already set
@@ -136,7 +144,7 @@ newPerlSorted(char *CLASS, char *sortName, SV *initialize, SV *compare, ...)
 
 		Onceref<PerlCallback> cbCompare; // defaults to NULL
 		if (SvOK(compare)) {
-			cbCompare = new PerlCallback();
+			cbCompare = new PerlCallback(true);
 			PerlCallbackInitializeSplit(cbCompare, "Triceps::IndexType::newPerlSorted(compare)", compare, 4, items-4);
 			if (cbCompare->code_ == NULL)
 				XSRETURN_UNDEF; // error message is already set
@@ -151,7 +159,7 @@ newPerlSorted(char *CLASS, char *sortName, SV *initialize, SV *compare, ...)
 	OUTPUT:
 		RETVAL
 
-# make an uninitialized copy
+#// make an uninitialized copy
 WrapIndexType *
 copy(WrapIndexType *self)
 	CODE:
@@ -161,6 +169,19 @@ copy(WrapIndexType *self)
 		clearErrMsg();
 		IndexType *ixt = self->get();
 		RETVAL = new WrapIndexType(ixt->copy());
+	OUTPUT:
+		RETVAL
+
+#// make a flat (i.e. without any sub-indexes or aggregators) uninitialized copy
+WrapIndexType *
+flatCopy(WrapIndexType *self)
+	CODE:
+		// for casting of return value
+		static char CLASS[] = "Triceps::IndexType";
+
+		clearErrMsg();
+		IndexType *ixt = self->get();
+		RETVAL = new WrapIndexType(ixt->copy(true));
 	OUTPUT:
 		RETVAL
 
@@ -174,15 +195,15 @@ same(WrapIndexType *self, WrapIndexType *other)
 	OUTPUT:
 		RETVAL
 
-# print(self, [ indent, [ subindent ] ])
-#   indent - default "", undef means "print everything in a signle line"
-#   subindent - default "  "
+#// print(self, [ indent, [ subindent ] ])
+#//   indent - default "", undef means "print everything in a signle line"
+#//   subindent - default "  "
 SV *
 print(WrapIndexType *self, ...)
 	PPCODE:
 		GEN_PRINT_METHOD(IndexType)
 
-# type comparisons
+#// type comparisons
 int
 equals(WrapIndexType *self, WrapIndexType *other)
 	CODE:
@@ -203,7 +224,7 @@ match(WrapIndexType *self, WrapIndexType *other)
 	OUTPUT:
 		RETVAL
 
-# check if leaf
+#// check if leaf
 int
 isLeaf(WrapIndexType *self)
 	CODE:
@@ -213,8 +234,8 @@ isLeaf(WrapIndexType *self)
 	OUTPUT:
 		RETVAL
 
-# add a nested index
-# XXX accept multiple subname-sub pairs as arguments
+#// add a nested index
+#// XXX accept multiple subname-sub pairs as arguments
 WrapIndexType *
 addSubIndex(WrapIndexType *self, char *subname, WrapIndexType *sub)
 	CODE:
@@ -263,7 +284,7 @@ setAggregator(WrapIndexType *self, WrapAggregatorType *wagg)
 	OUTPUT:
 		RETVAL
 
-# returns undef if no aggregator type set
+#// returns undef if no aggregator type set
 WrapAggregatorType *
 getAggregator(WrapIndexType *self)
 	CODE:
@@ -281,7 +302,7 @@ getAggregator(WrapIndexType *self)
 	OUTPUT:
 		RETVAL
 
-# find a nested index by name
+#// find a nested index by name
 WrapIndexType *
 findSubIndex(WrapIndexType *self, char *subname)
 	CODE:
@@ -300,7 +321,7 @@ findSubIndex(WrapIndexType *self, char *subname)
 	OUTPUT:
 		RETVAL
 
-# find a nested index by type id
+#// find a nested index by type id
 WrapIndexType *
 findSubIndexById(WrapIndexType *self, SV *idarg)
 	CODE:
@@ -324,7 +345,7 @@ findSubIndexById(WrapIndexType *self, SV *idarg)
 	OUTPUT:
 		RETVAL
 
-# returns an array of paired values (name => type)
+#// returns an array of paired values (name => type)
 SV *
 getSubIndexes(WrapIndexType *self)
 	PPCODE:
@@ -344,7 +365,7 @@ getSubIndexes(WrapIndexType *self)
 			XPUSHs(sv_2mortal(sub));
 		}
 
-# get the first leaf sub-index
+#// get the first leaf sub-index
 WrapIndexType *
 getFirstLeaf(WrapIndexType *self)
 	CODE:
@@ -357,7 +378,7 @@ getFirstLeaf(WrapIndexType *self)
 	OUTPUT:
 		RETVAL
 
-# get the index type identity
+#// get the index type identity
 int
 getIndexId(WrapIndexType *self)
 	CODE:
@@ -367,7 +388,7 @@ getIndexId(WrapIndexType *self)
 	OUTPUT:
 		RETVAL
 
-# check if the type has been initialized
+#// check if the type has been initialized
 int
 isInitialized(WrapIndexType *self)
 	CODE:
@@ -395,8 +416,8 @@ getTabtype(WrapIndexType *self)
 	OUTPUT:
 		RETVAL
 
-# returns the array of fields that are keys of this index
-# (may be empty if the index is not keyed by fields)
+#// returns the array of fields that are keys of this index
+#// (may be empty if the index is not keyed by fields)
 SV *
 getKey(WrapIndexType *self)
 	PPCODE:
@@ -411,10 +432,10 @@ getKey(WrapIndexType *self)
 			}
 		}
 
-# For a PerlSortedIndex: set the comparator function
-# @param compare - function to call to compare the row keys
-# @param ... - arguments for the comparator
-# @returns - 1 on success or undef on error
+#// For a PerlSortedIndex: set the comparator function
+#// @param compare - function to call to compare the row keys
+#// @param ... - arguments for the comparator
+#// @returns - 1 on success or undef on error
 int
 setComparator(WrapIndexType *self, SV *compare, ...)
 	CODE:
@@ -435,7 +456,7 @@ setComparator(WrapIndexType *self, SV *compare, ...)
 		
 		Onceref<PerlCallback> cbCompare; // defaults to NULL
 		if (SvOK(compare)) {
-			cbCompare = new PerlCallback();
+			cbCompare = new PerlCallback(true);
 			PerlCallbackInitializeSplit(cbCompare, funcName, compare, 2, items-2);
 			if (cbCompare->code_ == NULL)
 				XSRETURN_UNDEF; // error message is already set
@@ -449,4 +470,4 @@ setComparator(WrapIndexType *self, SV *compare, ...)
 	OUTPUT:
 		RETVAL
 
-# XXX isJumping, isReverse etc., or maybe better do it as getOptions()
+#// XXX isJumping, isReverse etc., or maybe better do it as getOptions()

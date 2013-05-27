@@ -1,5 +1,5 @@
 //
-// (C) Copyright 2011-2012 Sergey A. Babkin.
+// (C) Copyright 2011-2013 Sergey A. Babkin.
 // This file is a part of Triceps.
 // See the file COPYRIGHT for the copyright notice and license information
 //
@@ -19,6 +19,13 @@
 MODULE = Triceps::UnitTracer		PACKAGE = Triceps::UnitTracer
 ###################################################################################
 
+int
+CLONE_SKIP(...)
+	CODE:
+		RETVAL = 1;
+	OUTPUT:
+		RETVAL
+
 void
 DESTROY(WrapUnitTracer *self)
 	CODE:
@@ -26,7 +33,7 @@ DESTROY(WrapUnitTracer *self)
 		delete self;
 
 
-# to test a common call
+#// to test a common call
 int
 __testSuperclassCall(WrapUnitTracer *self)
 	CODE:
@@ -34,7 +41,7 @@ __testSuperclassCall(WrapUnitTracer *self)
 	OUTPUT:
 		RETVAL
 
-# check whether both refs point to the same object
+#// check whether both refs point to the same object
 int
 same(WrapUnitTracer *self, WrapUnitTracer *other)
 	CODE:
@@ -48,7 +55,7 @@ same(WrapUnitTracer *self, WrapUnitTracer *other)
 MODULE = Triceps::UnitTracer		PACKAGE = Triceps::UnitTracerStringName
 ###################################################################################
 
-# args are a hash of options
+#// args are a hash of options
 WrapUnitTracer *
 new(char *CLASS, ...)
 	CODE:
@@ -75,7 +82,7 @@ new(char *CLASS, ...)
 	OUTPUT:
 		RETVAL
 
-# getBuffer() would imply getting the error buffer, so call it just print()
+#// getBuffer() would imply getting the error buffer, so call it just print()
 char *
 print(WrapUnitTracer *self)
 	CODE:
@@ -98,7 +105,7 @@ clearBuffer(WrapUnitTracer *self)
 		if (sntr != NULL)
 			sntr->clearBuffer();
 
-# to test a subclass call
+#// to test a subclass call
 char *
 __testSubclassCall(WrapUnitTracer *self)
 	CODE:
@@ -129,7 +136,7 @@ new(char *CLASS, ...)
 	OUTPUT:
 		RETVAL
 
-# to test a subclass call
+#// to test a subclass call
 char *
 __testSubclassCall(WrapUnitTracer *self)
 	CODE:
@@ -142,5 +149,5 @@ __testSubclassCall(WrapUnitTracer *self)
 	OUTPUT:
 		RETVAL
 
-# XXX add getCode
-# XXX getCode should return an array?
+#// XXX add getCode
+#// XXX getCode should return an array?

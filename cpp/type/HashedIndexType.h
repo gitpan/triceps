@@ -1,5 +1,5 @@
 //
-// (C) Copyright 2011-2012 Sergey A. Babkin.
+// (C) Copyright 2011-2013 Sergey A. Babkin.
 // This file is a part of Triceps.
 // See the file COPYRIGHT for the copyright notice and license information
 //
@@ -39,7 +39,8 @@ public:
 
 	// from IndexType
 	virtual const_Onceref<NameSet> getKey() const;
-	virtual IndexType *copy() const;
+	virtual IndexType *copy(bool flat = false) const;
+	virtual IndexType *deepCopy(HoldRowTypes *holder) const;
 	virtual void initialize();
 	virtual Index *makeIndex(const TableType *tabtype, Table *table) const;
 	virtual void initRowHandleSection(RowHandle *rh) const;
@@ -63,9 +64,13 @@ protected:
 		Less(const RowType *rt, intptr_t rhOffset, const vector<int32_t> &keyFld);
 
 		// from TreeIndexType::Less
+		virtual TreeIndexType::Less *tableCopy(Table *t) const;
 		virtual bool operator() (const RowHandle *r1, const RowHandle *r2) const;
 
 	protected:
+		// Internals of the tableCopy();
+		Less(const Less *other, Table *t);
+
 		const vector<int32_t> &keyFld_; // indexes of key fields in the record
 		intptr_t rhOffset_; // offset of this index's data in table's row handle
 
@@ -75,7 +80,9 @@ protected:
 
 protected:
 	// used by copy()
-	HashedIndexType(const HashedIndexType &orig);
+	HashedIndexType(const HashedIndexType &orig, bool flat);
+	// used by deepCopy()
+	HashedIndexType(const HashedIndexType &orig, HoldRowTypes *holder);
 
 protected:
 	Autoref<Less> less_;

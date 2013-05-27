@@ -1,5 +1,5 @@
 //
-// (C) Copyright 2011-2012 Sergey A. Babkin.
+// (C) Copyright 2011-2013 Sergey A. Babkin.
 // This file is a part of Triceps.
 // See the file COPYRIGHT for the copyright notice and license information
 //
@@ -12,8 +12,11 @@
 #include <type/RowSetType.h>
 #include <sched/Label.h>
 #include <sched/FnBinding.h>
+#include <app/Xtray.h>
 
 namespace TRICEPS_NS {
+
+class Facet;
 
 // The concept of the streaming function is:
 // You call some label(s), that performs some streaming computations and 
@@ -41,7 +44,7 @@ namespace TRICEPS_NS {
 // some rowops through some inputs of the function before the
 // "data" rowops.
 //
-// The FnReturn is very inconvenient su subclass, to the context has
+// The FnReturn is very inconvenient to subclass, so the context has
 // its own class that can be attached to a FnReturn.
 // The methods "onPush" and "onPop" can be defined in the subclass
 // of FnContext to save and restore this context for the recursive calls.
@@ -68,11 +71,13 @@ public:
 
 class FnReturn: public Starget
 {
+	friend class Facet;
 protected:
 	// The class of labels created inside FnReturn, that forward the rowops
 	// to the final destination.
 	class RetLabel : public Label
 	{
+		friend class FnReturn;
 	public:
 		// @param unit - the unit where this label belongs
 		// @param rtype - type of row to be handled by this label
@@ -92,6 +97,8 @@ protected:
 
 		FnReturn *fnret_; // not a ref, to avoid cyclic refs
 		int idx_; // index in fnret_ to which to forward
+		bool isBegin_; // this label represents a _BEGIN_ in a Facet
+		bool isEnd_; // this label represents an _END_ in a Facet
 	};
 
 public:
@@ -160,8 +167,10 @@ public:
 	// @param from - a label, from which the row type will be taken, 
 	//        and to which the result label will be chained.
 	//        Must belong to the same unit (or error will be remembered).
+	// @param front - flag: chain this label at the front of the "from" label
+	//        Is true by default, matching Perl!
 	// @return - the same FnReturn object, for chained calls.
-	FnReturn *addFromLabel(const string &lname, Autoref<Label>from);
+	FnReturn *addFromLabel(const string &lname, Autoref<Label>from, bool front = true);
 	
 	// Add a RetLabel to the result. Any errors will be remembered and
 	// reported during initialization.
@@ -313,6 +322,12 @@ public:
 		return stack_;
 	}
 
+	// Check whether this FnReturn is used to write to a facet.
+	bool isFaceted() const
+	{
+		return !xtray_.isNull();
+	}
+
 protected:
 	// Called on the clearing of any RetLabel in this return.
 	void clear()
@@ -323,10 +338,38 @@ protected:
 		}
 	}
 
+	// Interface for Facet
+	// {
+
+	// Check if the Xtray is empty.
+	bool isXtrayEmpty() const
+	{
+		return xtray_.isNull() || xtray_->empty();
+	}
+
+	// Swap the xtray reference. 
+	// This is used in multiple ways:
+	// * to set up the first tray when the FnReturn gets tied to a writer Facet
+	// * to set a fresh xtray and get the filled one to send it to the nexus
+	// * to clear the xtray when the Facet disconnectes itself from FnReturn
+	// @param other - other Xtray reference to swap with
+	void swapXtray(Autoref<Xtray> &other)
+	{
+		xtray_.swap(other);
+	}
+
+	// Set the relation to a Facet.
+	// Sets facet_ and the flags in the labels that represent _BEGIN_ and _END_.
+	void setFacet(Facet *fa);
+
+	// }
+
 	Unit *unit_; // not a reference, used only to create the labels
+	Facet *facet_; // not a reference, the facet that wraps this object, or NULL; set directly by Facet
 	string name_; // human-readable name, and base for the label names
 	Autoref<RowSetType> type_;
 	Autoref<FnContext> context_;
+	Autoref<Xtray> xtray_; // if writing to a Nexus, the buffer to collect the transaction
 	ReturnVec labels_; // the return labels, same size as the type
 	BindingVec stack_; // the top of call stack is the end of vector
 	bool initialized_; // flag: has already been initialized, no more changes allowed

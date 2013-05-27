@@ -1,5 +1,5 @@
 //
-// (C) Copyright 2011-2012 Sergey A. Babkin.
+// (C) Copyright 2011-2013 Sergey A. Babkin.
 // This file is a part of Triceps.
 // See the file COPYRIGHT for the copyright notice and license information
 //
@@ -110,6 +110,43 @@ UTESTCASE assign(Utest *utest)
 	}
 	UT_ASSERT(tg::outstanding == 1);
 	p2 = 0;
+	UT_ASSERT(tg::outstanding == 0);
+}
+
+UTESTCASE swap(Utest *utest)
+{
+	UT_ASSERT(tg::outstanding == 0);
+	{
+		Autoref<tg> p(new tg);
+		Autoref<tg> p2;
+		UT_ASSERT(tg::outstanding == 1);
+
+		tg *obj = p.get();
+
+		p.swap(p2); // swap to NULL
+		UT_ASSERT(tg::outstanding == 1);
+		UT_IS(p.get(), 0);
+		UT_IS(p2.get(), obj);
+
+		p.swap(p2); // swap from NULL
+		UT_ASSERT(tg::outstanding == 1);
+		UT_IS(p.get(), obj);
+		UT_IS(p2.get(), 0);
+
+		p.swap(p); // swap from itself
+		UT_ASSERT(tg::outstanding == 1);
+		UT_IS(p.get(), obj);
+
+		p2 = new tg;
+		UT_ASSERT(tg::outstanding == 2);
+
+		tg *obj2 = p2.get();
+
+		p.swap(p2); // two objects
+		UT_ASSERT(tg::outstanding == 2);
+		UT_IS(p.get(), obj2);
+		UT_IS(p2.get(), obj);
+	}
 	UT_ASSERT(tg::outstanding == 0);
 }
 

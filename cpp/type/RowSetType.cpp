@@ -1,5 +1,5 @@
 //
-// (C) Copyright 2011-2012 Sergey A. Babkin.
+// (C) Copyright 2011-2013 Sergey A. Babkin.
 // This file is a part of Triceps.
 // See the file COPYRIGHT for the copyright notice and license information
 //
@@ -7,6 +7,7 @@
 // Representation of an ordered set of row types. 
 
 #include <type/RowSetType.h>
+#include <type/HoldRowTypes.h>
 #include <common/Exception.h>
 
 namespace TRICEPS_NS {
@@ -16,6 +17,16 @@ RowSetType::RowSetType() :
 	errors_(NULL),
 	initialized_(false)
 { }
+
+RowSetType *RowSetType::deepCopy(HoldRowTypes *holder) const
+{
+	RowSetType *cp = new RowSetType;
+	int sz = types_.size();
+	for (int i = 0; i < sz; i++) {
+		cp->addRow(names_[i], holder->copy(types_[i]));
+	}
+	return cp;
+}
 
 RowSetType *RowSetType::addRow(const string &rname, const_Autoref<RowType>rtype)
 {

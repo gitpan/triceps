@@ -1,5 +1,5 @@
 #
-# (C) Copyright 2011-2012 Sergey A. Babkin.
+# (C) Copyright 2011-2013 Sergey A. Babkin.
 # This file is a part of Triceps.
 # See the file COPYRIGHT for the copyright notice and license information
 #
@@ -15,7 +15,7 @@
 use ExtUtils::testlib;
 
 use Test;
-BEGIN { plan tests => 75 };
+BEGIN { plan tests => 104 };
 use Triceps;
 ok(1); # If we made it this far, we're ok.
 
@@ -314,6 +314,51 @@ table \(
 }/);
 }
 
+###################### findIndexPathForKeys ###########################
+
+{
+	my $ttDeep = Triceps::TableType->new($rt1)
+		->addSubIndex("by_ab",
+			Triceps::IndexType->newHashed(key => [ "a", "b" ])
+			->addSubIndex("by_ac", # duplicate a
+				Triceps::IndexType->newHashed(key => [ "a", "c" ])
+			)
+			->addSubIndex("by_c", # currently has no key
+				Triceps::SimpleOrderedIndex->new(
+					c => "DESC",
+				)
+				->addSubIndex("by_c", # an index with no key would not allow to reach this
+					Triceps::IndexType->newHashed(key => [ "c" ])
+				)
+			)
+		)
+		->addSubIndex("fifo", # has no key
+			Triceps::IndexType->newFifo()
+		)
+		->addSubIndex("by_c",
+			Triceps::IndexType->newHashed(key => [ "c" ])
+			->addSubIndex("by_ab",
+				Triceps::IndexType->newHashed(key => [ "a", "b" ])
+			)
+		)
+	;
+	ok(ref $ttDeep, "Triceps::TableType");
+	my @path = $ttDeep->findIndexPathForKeys("a", "b", "c");
+	ok(join(',', @path), "by_c,by_ab");
+
+	# the order of fields doesn't matter
+	@path = $ttDeep->findIndexPathForKeys("c", "b", "a");
+	ok(join(',', @path), "by_c,by_ab");
+
+	# an empty key set produces empty result
+	@path = $ttDeep->findIndexPathForKeys();
+	ok($#path, -1);
+
+	# if can not find, an empty result
+	@path = $ttDeep->findIndexPathForKeys("d", "b", "a");
+	ok($#path, -1);
+}
+
 ###################### initialization #################################
 
 $res = $tt1->isInitialized();
@@ -344,4 +389,149 @@ ok($tt1->same($res));
 $res = $tt1->addSubIndex("second", Triceps::IndexType->newFifo());
 ok(!defined $res);
 ok($! . "", "Triceps::TableType::addSubIndex: table is already initialized, can not add indexes any more");
+
+###################### copy ###########################################
+
+{
+	my $ttcp = $tt1->copy();
+	ok(ref $ttcp, "Triceps::TableType");
+	#printf "tt1: %s\nttcp: %s\n", $tt1->print(), $ttcp->print();
+	ok($tt1->equals($ttcp));
+}
+
+###################### copy ###########################################
+
+{
+	# this really tests the copying of PerlAggregator, the method TableType::deepCopy()
+	# itself is unpublished in Perl
+
+	# add an aggregator for the test
+	my $ttorig = $tt1->copy();
+	$ttorig->findSubIndex("primary")->setAggregator(
+		Triceps::AggregatorType->new($rt1, "aggr", ' ', ' ') # use the version with source code
+	);
+
+	# now test
+	my $ttcp = $ttorig->deepCopy();
+	ok(ref $ttcp, "Triceps::TableType");
+	#printf "tt1: %s\nttcp: %s\n", $tt1->print(), $ttcp->print();
+	ok($ttorig->equals($ttcp));
+
+	my $cprt1 = $ttcp->getRowType();
+	my $cprt2 = $ttcp->findSubIndex("primary")->getAggregator()->getRowType();
+	ok($cprt1->same($cprt2));
+}
+
+###################### copyFundamental ################################
+
+{
+	# make a widely branching table to copy from
+	my $ttorig = Triceps::TableType->new($rt1)
+		->addSubIndex(one => Triceps::IndexType->newHashed(key => [ "b", "c" ])
+			->addSubIndex(a => Triceps::IndexType->newFifo()
+				->setAggregator(Triceps::AggregatorType->new($rt1, "ag-one-a", undef, ' '))
+			)
+			->addSubIndex(b => Triceps::IndexType->newFifo()
+				->setAggregator(Triceps::AggregatorType->new($rt1, "ag-one-b", undef, ' '))
+			)
+			->setAggregator(Triceps::AggregatorType->new($rt1, "ag-one", undef, ' '))
+		)
+		->addSubIndex(two => Triceps::SimpleOrderedIndex->new("b" => "ASC" , "c" => "ASC")
+			->addSubIndex(a => Triceps::IndexType->newFifo()
+				->setAggregator(Triceps::AggregatorType->new($rt1, "ag-two-a", undef, ' '))
+			)
+			->addSubIndex(b => Triceps::IndexType->newHashed(key => [ "d" ])
+				->setAggregator(Triceps::AggregatorType->new($rt1, "ag-two-b", undef, ' '))
+			)
+			->setAggregator(Triceps::AggregatorType->new($rt1, "ag-two", undef, ' '))
+		)
+	;
+
+	{
+		my $ttcopy = $ttorig->copyFundamental();
+		ok($ttcopy->print(undef), 'table ( row { uint8 a, int32 b, int64 c, float64 d, string e, } ) { index HashedIndex(b, c, ) { index FifoIndex() a, } one, }');
+	}
+
+	{
+		my $ttcopy = $ttorig->copyFundamental("NO_FIRST_LEAF");
+		ok($ttcopy->print(undef), 'table ( row { uint8 a, int32 b, int64 c, float64 d, string e, } ) { }');
+	}
+
+	{
+		# the first leaf specified implicitly and explicitly
+		my $ttcopy = $ttorig->copyFundamental([ "one", "a" ]);
+		ok($ttcopy->print(undef), 'table ( row { uint8 a, int32 b, int64 c, float64 d, string e, } ) { index HashedIndex(b, c, ) { index FifoIndex() a, } one, }');
+	}
+
+	{
+		# another leaf from "one"
+		my $ttcopy = $ttorig->copyFundamental([ "one", "b" ]);
+		ok($ttcopy->print(undef), 'table ( row { uint8 a, int32 b, int64 c, float64 d, string e, } ) { index HashedIndex(b, c, ) { index FifoIndex() a, index FifoIndex() b, } one, }');
+	}
+
+	{
+		# put the second index first, also "+" under a leaf index
+		my $ttcopy = $ttorig->copyFundamental([ "two", "b" ], [ "one", "a", "+" ], "NO_FIRST_LEAF", );
+		ok($ttcopy->print(undef), 'table ( row { uint8 a, int32 b, int64 c, float64 d, string e, } ) { index PerlSortedIndex(SimpleOrder b ASC, c ASC, ) { index HashedIndex(d, ) b, } two, index HashedIndex(b, c, ) { index FifoIndex() a, } one, }');
+	}
+
+	# errors
+	{
+		eval { $ttorig->copyFundamental("no_first_leaf") };
+		ok($@, qr/^Triceps::TableType::copyFundamental: the arguments must be either references to arrays of path strings or 'NO_FIRST_LEAF', got 'no_first_leaf'/);
+	}
+	{
+		eval { $ttorig->copyFundamental(["one", "z"]) };
+		ok($@, qr/^Triceps::TableType::copyFundamental: unable to find the index type at path 'one.z', table type is:/);
+	}
+}
+
+###################### findOrAddIndex #################################
+
+{
+	my $ttProto = Triceps::TableType->new($rt1)
+		->addSubIndex("by_ab",
+			Triceps::IndexType->newHashed(key => [ "a", "b" ])
+			->addSubIndex("by_c",
+				Triceps::IndexType->newHashed(key => [ "c" ])
+			)
+		)
+	;
+	# find an existing index
+	ok(ref $ttProto, "Triceps::TableType");
+	my @path = $ttProto->findOrAddIndex("a", "b", "c");
+	ok(join(',', @path), "by_ab,by_c");
+
+	# add a new index
+	my $tt2 = $ttProto->copy();
+	ok(ref $tt2, "Triceps::TableType");
+	@path = $tt2->findOrAddIndex("a", "c");
+	ok(join(',', @path), "by_a_c");
+	ok($tt2->print(undef), "table ( row { uint8 a, int32 b, int64 c, float64 d, string e, } ) { index HashedIndex(a, b, ) { index HashedIndex(c, ) by_c, } by_ab, index HashedIndex(a, c, ) { index FifoIndex() fifo, } by_a_c, }");
+	ok($tt2->initialize());
+
+	# try a conflicting name
+	$tt2 = Triceps::TableType->new($rt1)
+		->addSubIndex("by_a_c",
+			Triceps::IndexType->newHashed(key => [ "a" ])
+		)
+		->addSubIndex("by_a_c_",
+			Triceps::IndexType->newHashed(key => [ "a" ])
+		)
+	;
+	ok(ref $tt2, "Triceps::TableType");
+	@path = $tt2->findOrAddIndex("a", "c");
+	ok(join(',', @path), "by_a_c__");
+	ok($tt2->initialize());
+
+	# try an unknown field
+	$tt2 = $ttProto->copy();
+	ok(ref $tt2, "Triceps::TableType");
+	eval { $tt2->findOrAddIndex("a", "zzz"); };
+	ok($@, qr/^Triceps::TableType::findOrAddIndex: can not use a non-existing field 'zzz' to create an index\n  table row type:\n  row {\n    uint8 a,\n    int32 b,\n    int64 c,\n    float64 d,\n    string e,\n  }\n  at/);
+
+	# an empty field list
+	eval { $tt2->findOrAddIndex(); };
+	ok($@, qr/^Triceps::TableType::findOrAddIndex: no index fields specified at/);
+}
 

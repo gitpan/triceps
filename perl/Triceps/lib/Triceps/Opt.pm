@@ -1,5 +1,5 @@
 #
-# (C) Copyright 2011-2012 Sergey A. Babkin.
+# (C) Copyright 2011-2013 Sergey A. Babkin.
 # This file is a part of Triceps.
 # See the file COPYRIGHT for the copyright notice and license information
 #
@@ -7,7 +7,9 @@
 
 package Triceps::Opt;
 
-our $VERSION = 'v1.0.91';
+sub CLONE_SKIP { 1; }
+
+our $VERSION = 'v1.0.92';
 
 use Carp;
 use Scalar::Util;
@@ -36,25 +38,40 @@ use Scalar::Util;
 #        mand => [ undef, \&parseopt::ck_mandatory ],
 #        opt => [ 9, undef ],
 #    };
+# The special option name "*" allows to consume all the unknown options.
+# Its description is ignored as such, just use a [] for a placeholder,
+# in case if some support will be added in the future.
+# All these unknown options will be collected in an array, referenced
+# in $instance at the key "*".
 sub parse # ($class, %$instance, %$optdescr, @opts)
 {
 	my $class = shift;
 	my $instance = shift;
 	my $descr = shift; # ref to hash of optionName => defaultValue
 	my ($k, $varr, $v);
+	my $any = 0; # flag: accept any options into "*"
 
 	foreach $k (keys %$descr) { # set the defaults
-		$v = $descr->{$k}[0];
-		#print STDERR "DEBUG set $k=(", $v, ")\n";
-		$instance->{$k} = $descr->{$k}[0];
+		if ($k eq "*") {
+			$any = 1;
+			$instance->{$k} = [];
+		} else {
+			$v = $descr->{$k}[0];
+			#print STDERR "DEBUG set $k=(", $v, ")\n";
+			$instance->{$k} = $descr->{$k}[0];
+		}
 	}
 
 	while ($#_ >= 1) { # pick in pairs
 		$k = shift;
 		$v = shift;
-		Carp::confess "Unknown option '$k' for class '$class'"
-			unless exists $descr->{$k};
-		$instance->{$k} = $v;
+		if (exists $descr->{$k}) {
+			$instance->{$k} = $v;
+		} elsif ($any) {
+			push(@{$instance->{"*"}}, $k, $v);
+		} else {
+			Carp::confess "Unknown option '$k' for class '$class'";
+		}
 	}
 	Carp::confess "Last option '$k' for class '$class' is without a value"
 		unless $#_ == -1;
@@ -91,7 +108,7 @@ sub ck_mandatory
 }
 
 # check that the option value is a reference to a class
-# @param refto - class name (or ARRAY or HASH)
+# @param refto - class name (or ARRAY or HASH or CODE)
 # @param reftoref (optional) - if refto is ARRAY or HASH, can be used
 #        to specify the type of values in it
 sub ck_ref
@@ -133,6 +150,67 @@ sub ck_refscalar
 	# a tricky point: a scalar may contain a reference in it, which is OK since it will be overwritten
 	Carp::confess "Option '$optname' of class '$class' must be a reference to a scalar, is '$rval'"
 		unless ($rval eq 'SCALAR' || $rval eq 'REF');
+}
+
+###########
+# Drop the designated options from the option list.
+# This function is convenient to create the wrapper functions that
+# accepts a superset of options, they can then drop the options
+# they have handled themselves and pass through the rest to the
+# next layer.
+#
+# @param %$drops - reference to a hash containing the names of
+#        options to drop as their keys (the values don't matter)
+# @param @$opts - reference to the list of original options
+# @return - the list of options without the dropped ones
+sub drop($$) { # (%$drops, @$opts) -> @opts
+	my $drops = shift;
+	my $opts = shift;
+	my(@res, $o);
+	confess "The argument 1 must be a hash reference of option names"
+		unless (ref $drops eq "HASH");
+	confess "The argument 2 must be an array reference of option list"
+		unless (ref $opts eq "ARRAY");
+	while ($#{$opts} >= 0) {
+		$o = shift @$opts;
+		if (exists $$drops{$o}) {
+			shift @$opts;
+		} else {
+			push @res, $o, shift @$opts;
+		}
+	}
+	return @res;
+}
+
+###########
+# Drop the options except designated ones from the option list.
+# This function is convenient to create the wrapper functions that
+# accepts a superset of options, they can then drop the options
+# that are not handled by the next layer. 
+# In this case the argument should be the same as the mext layer
+# passes to Opt::parse() in %$optdescr.
+#
+# @param %$except - reference to a hash containing the names of
+#        options to not drop as their keys (the values don't matter)
+# @param @$opts - reference to the list of original options
+# @return - the list of options without the dropped ones
+sub dropExcept($$) { # (%$except, @$opts) -> @opts
+	my $except = shift;
+	my $opts = shift;
+	my(@res, $o);
+	confess "The argument 1 must be a hash reference of option names"
+		unless (ref $except eq "HASH");
+	confess "The argument 2 must be an array reference of option list"
+		unless (ref $opts eq "ARRAY");
+	while ($#{$opts} >= 0) {
+		$o = shift @$opts;
+		if (exists $$except{$o}) {
+			push @res, $o, shift @$opts;
+		} else {
+			shift @$opts;
+		}
+	}
+	return @res;
 }
 
 ###########

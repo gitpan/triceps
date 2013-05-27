@@ -1,5 +1,5 @@
 //
-// (C) Copyright 2011-2012 Sergey A. Babkin.
+// (C) Copyright 2011-2013 Sergey A. Babkin.
 // This file is a part of Triceps.
 // See the file COPYRIGHT for the copyright notice and license information
 //
@@ -24,6 +24,28 @@ void mkfields(RowType::FieldVec &fields)
 	fields.push_back(RowType::Field("d", Type::r_float64));
 	fields.push_back(RowType::Field("e", Type::r_string));
 }
+
+class FnReturnGuts: public FnReturn
+{
+public:
+	static Xtray *getXtray(FnReturn *fret)
+	{
+		const FnReturnGuts *frg = (FnReturnGuts *)fret;
+		return frg->xtray_;
+	}
+
+	static bool isXtrayEmpty(FnReturn *fret)
+	{
+		const FnReturnGuts *frg = (FnReturnGuts *)fret;
+		return frg->FnReturn::isXtrayEmpty();
+	}
+
+	static void swapXtray(FnReturn *fret, Autoref<Xtray> &other)
+	{
+		FnReturnGuts *frg = (FnReturnGuts *)fret;
+		frg->FnReturn::swapXtray(other);
+	}
+};
 
 class MyFnCtx: public FnContext
 {
@@ -437,6 +459,15 @@ UTESTCASE fn_binding(Utest *utest)
 	UT_IS(labels.size(), 2);
 	UT_IS(labels[0], lb1a);
 	UT_IS(labels[1], lb3a);
+
+	const FnBinding::BoolVec &clears = bind1->getAutoclear();
+	UT_IS(clears.size(), 2);
+	UT_IS(clears[0], true);
+	UT_IS(clears[1], true);
+
+	UT_IS(bind1->isAutoclear("one"), true);
+	UT_IS(bind1->isAutoclear("two"), true);
+	UT_IS(bind1->isAutoclear("unknown"), false);
 }
 
 UTESTCASE call_bindings(Utest *utest)
@@ -477,17 +508,24 @@ UTESTCASE call_bindings(Utest *utest)
 	Autoref<Label> lb1 = new DummyLabel(unit1, rt1, "lb1");
 	Autoref<Label> lb1x = new DummyLabel(unit2, rt1, "lb1x");
 	Autoref<Label> lb1a = new DummyLabel(unit1, rt1, "lb1a");
+	Autoref<Label> lb1z = new DummyLabel(unit1, rt1, "lb1z");
 	Autoref<Label> lb2 = new DummyLabel(unit1, rt2, "lb2");
 	Autoref<Label> lb2a = new DummyLabel(unit1, rt2, "lb2a");
+	Autoref<Label> lb2z = new DummyLabel(unit1, rt2, "lb2z");
 	Autoref<Label> lb3 = new DummyLabel(unit1, rt3, "lb3");
 	Autoref<Label> lb3a = new DummyLabel(unit1, rt3, "lb3a");
+
+	// to test the chaining order, chain lb[12]z first, and then
+	// it will get displaced
+	UT_ASSERT(!lb1->chain(lb1z)->hasError());
+	UT_ASSERT(!lb2->chain(lb2z)->hasError());
 
 	// make the return
 	Autoref<MyFnCtx> ctx1 = new MyFnCtx;
 	Autoref<FnReturn> fret1 = initialize(FnReturn::make(unit1, "fret1")
 		->setContext(ctx1)
 		->addFromLabel("one", lb1)
-		->addFromLabel("two", lb2)
+		->addFromLabel("two", lb2, false)
 	);
 	UT_ASSERT(fret1->getErrors().isNull());
 	UT_ASSERT(fret1->isInitialized());
@@ -550,6 +588,8 @@ UTESTCASE call_bindings(Utest *utest)
 		"unit 'u' before-chained label 'lb1' op OP_INSERT {\n"
 		"unit 'u' before label 'fret1.one' (chain 'lb1') op OP_INSERT {\n"
 		"unit 'u' after label 'fret1.one' (chain 'lb1') op OP_INSERT }\n"
+		"unit 'u' before label 'lb1z' (chain 'lb1') op OP_INSERT {\n"
+		"unit 'u' after label 'lb1z' (chain 'lb1') op OP_INSERT }\n"
 		"unit 'u' after-chained label 'lb1' op OP_INSERT }\n"
 		"unit 'u' after label 'lb1' op OP_INSERT }\n"
 	);
@@ -565,6 +605,8 @@ UTESTCASE call_bindings(Utest *utest)
 	UT_IS(msg, 
 		"unit 'u' before label 'lb2' op OP_INSERT {\n"
 		"unit 'u' before-chained label 'lb2' op OP_INSERT {\n"
+		"unit 'u' before label 'lb2z' (chain 'lb2') op OP_INSERT {\n"
+		"unit 'u' after label 'lb2z' (chain 'lb2') op OP_INSERT }\n"
 		"unit 'u' before label 'fret1.two' (chain 'lb2') op OP_INSERT {\n"
 
 		"unit 'u' before label 'lb3a' (chain 'fret1.two') op OP_INSERT {\n"
@@ -587,6 +629,8 @@ UTESTCASE call_bindings(Utest *utest)
 		"unit 'u' before-chained label 'lb1' op OP_INSERT {\n"
 		"unit 'u' before label 'fret1.one' (chain 'lb1') op OP_INSERT {\n"
 		"unit 'u' after label 'fret1.one' (chain 'lb1') op OP_INSERT }\n"
+		"unit 'u' before label 'lb1z' (chain 'lb1') op OP_INSERT {\n"
+		"unit 'u' after label 'lb1z' (chain 'lb1') op OP_INSERT }\n"
 		"unit 'u' after-chained label 'lb1' op OP_INSERT }\n"
 		"unit 'u' after label 'lb1' op OP_INSERT }\n"
 	);
@@ -627,6 +671,8 @@ UTESTCASE call_bindings(Utest *utest)
 		"unit 'u' before-chained label 'lb1' op OP_INSERT {\n"
 		"unit 'u' before label 'fret1.one' (chain 'lb1') op OP_INSERT {\n"
 		"unit 'u' after label 'fret1.one' (chain 'lb1') op OP_INSERT }\n"
+		"unit 'u' before label 'lb1z' (chain 'lb1') op OP_INSERT {\n"
+		"unit 'u' after label 'lb1z' (chain 'lb1') op OP_INSERT }\n"
 		"unit 'u' after-chained label 'lb1' op OP_INSERT }\n"
 		"unit 'u' after label 'lb1' op OP_INSERT }\n"
 	);
@@ -642,6 +688,8 @@ UTESTCASE call_bindings(Utest *utest)
 	UT_IS(msg, 
 		"unit 'u' before label 'lb2' op OP_INSERT {\n"
 		"unit 'u' before-chained label 'lb2' op OP_INSERT {\n"
+		"unit 'u' before label 'lb2z' (chain 'lb2') op OP_INSERT {\n"
+		"unit 'u' after label 'lb2z' (chain 'lb2') op OP_INSERT }\n"
 		"unit 'u' before label 'fret1.two' (chain 'lb2') op OP_INSERT {\n"
 
 		"unit 'u' before label 'lb3a' (chain 'fret1.two') op OP_INSERT {\n"
@@ -1101,6 +1149,87 @@ UTESTCASE tray_bindings(Utest *utest)
 
 	fret1->pop(bind1);
 	
+}
+
+UTESTCASE xtray(Utest *utest)
+{
+	string msg;
+	Exception::abort_ = false; // make them catchable
+	Exception::enableBacktrace_ = false; // make the error messages predictable
+	Autoref<Tray> t;
+
+	RowType::FieldVec fld;
+	mkfields(fld);
+
+	Autoref<Unit> unit1 = new Unit("u");
+
+	// make the components
+	Autoref<RowType> rt1 = new CompactRowType(fld);
+	UT_ASSERT(rt1->getErrors().isNull());
+	
+	fld[2].type_ = Type::r_int32;
+	Autoref<RowType> rt2 = new CompactRowType(fld);
+	UT_ASSERT(rt2->getErrors().isNull());
+
+	Autoref<Label> lb1 = new DummyLabel(unit1, rt1, "lb1");
+	Autoref<Label> lb2 = new DummyLabel(unit1, rt2, "lb2");
+
+	// make the return
+	Autoref<FnReturn> fret1 = initialize(FnReturn::make(unit1, "fret1")
+		->addFromLabel("one", lb1)
+		->addFromLabel("two", lb2)
+	);
+	UT_ASSERT(fret1->getErrors().isNull());
+	UT_ASSERT(fret1->isInitialized());
+
+	// no xtray by default
+	UT_ASSERT(!fret1->isFaceted());
+	UT_ASSERT(FnReturnGuts::isXtrayEmpty(fret1));
+	UT_IS(FnReturnGuts::getXtray(fret1), NULL);
+	
+	// set the xtray
+	Autoref<Xtray> xt1 = new Xtray(fret1->getType());
+	Xtray *xtp1 = xt1;
+	FnReturnGuts::swapXtray(fret1, xt1);
+	UT_IS(xt1.get(), NULL); // old value
+	UT_ASSERT(fret1->isFaceted());
+	UT_ASSERT(FnReturnGuts::isXtrayEmpty(fret1));
+	UT_IS(FnReturnGuts::getXtray(fret1), xtp1);
+
+	// make the rows to send
+	FdataVec dv; // just leave the contents all NULL
+	Autoref<Rowop> op1 = new Rowop(lb1, Rowop::OP_INSERT, rt1->makeRow(dv));
+	Autoref<Rowop> op2 = new Rowop(lb2, Rowop::OP_DELETE, rt2->makeRow(dv));
+
+	// send the data
+	unit1->call(op1);
+	UT_ASSERT(!FnReturnGuts::isXtrayEmpty(fret1));
+	UT_IS(FnReturnGuts::getXtray(fret1)->size(), 1);
+	unit1->call(op2);
+	UT_ASSERT(!FnReturnGuts::isXtrayEmpty(fret1));
+	UT_IS(FnReturnGuts::getXtray(fret1)->size(), 2);
+
+	// swap the tray again
+	xt1 = new Xtray(fret1->getType());
+	Xtray *xtp2 = xt1;
+	FnReturnGuts::swapXtray(fret1, xt1);
+	UT_IS(xt1.get(), xtp1); // old value
+	UT_ASSERT(fret1->isFaceted());
+	UT_ASSERT(FnReturnGuts::isXtrayEmpty(fret1));
+	UT_IS(FnReturnGuts::getXtray(fret1), xtp2);
+
+	UT_IS(xt1->at(0).idx_, 0);
+	UT_IS(xt1->at(0).row_, op1->getRow());
+	UT_IS(xt1->at(0).opcode_, Rowop::OP_INSERT);
+	UT_IS(xt1->at(1).idx_, 1);
+	UT_IS(xt1->at(1).row_, op2->getRow());
+	UT_IS(xt1->at(1).opcode_, Rowop::OP_DELETE);
+
+	// reset the xtray to NULL
+	xt1 = NULL;
+	FnReturnGuts::swapXtray(fret1, xt1);
+	UT_IS(xt1.get(), xtp2); // old value
+	UT_ASSERT(!fret1->isFaceted());
 }
 
 int cleared;

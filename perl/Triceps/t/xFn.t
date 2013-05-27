@@ -1,5 +1,5 @@
 #
-# (C) Copyright 2011-2012 Sergey A. Babkin.
+# (C) Copyright 2011-2013 Sergey A. Babkin.
 # This file is a part of Triceps.
 # See the file COPYRIGHT for the copyright notice and license information
 #
@@ -1719,6 +1719,8 @@ ok(&getResultLines(),
 
 package FnCollapse;
 
+sub CLONE_SKIP { 1; }
+
 our @ISA=qw(Triceps::Collapse);
 
 sub new # ($class, $optName => $optValue, ...)
@@ -1943,6 +1945,8 @@ ok(&getResultLines(), $expectResult);
 
 package FnCollapseClose;
 
+sub CLONE_SKIP { 1; }
+
 our @ISA=qw(FnCollapse);
 
 sub new # ($class, $optName => $optValue, ...)
@@ -2072,6 +2076,8 @@ ok(&getResultLines(), $expectResult);
 # is done by chaining.
 
 package FnCollapseClose3;
+
+sub CLONE_SKIP { 1; }
 
 our @ISA=qw(FnCollapse);
 
@@ -2411,7 +2417,7 @@ sub makePipePrintLabel($$$) # ($print_label_name, $parent_label, $out_label)
 			$unit->makeArrayCall(
 				$lbOutput, "OP_INSERT", $_[1]->printP());
 		}) or confess "$!";
-	$lbParent->chain($lb) or confess "$!";
+	$lbParent->chain($lb);
 	return $lb;
 }
 

@@ -1,5 +1,5 @@
 //
-// (C) Copyright 2011-2012 Sergey A. Babkin.
+// (C) Copyright 2011-2013 Sergey A. Babkin.
 // This file is a part of Triceps.
 // See the file COPYRIGHT for the copyright notice and license information
 //
@@ -140,7 +140,7 @@ void RowType::printTo(string &res, const string &indent, const string &subindent
 
 Erref RowType::parse()
 {
-	Erref err = new Errors;
+	Erref err;
 
 	size_t i, n = fields_.size();
 
@@ -149,29 +149,25 @@ Erref RowType::parse()
 		const string &name = fields_[i].name_;
 
 		if (name.empty()) {
-			err->appendMsg(true, strprintf("field %d name must not be empty", (int)i+1));
+			err.f("field %d name must not be empty", (int)i+1);
 			continue;
 		}
 
 		if (idmap_.find(name) != idmap_.end())  {
-			err->appendMsg(true, strprintf("duplicate field name '%s' for fields %d and %d",
-				name.c_str(), (int)i+1, (int)(idmap_[name])+1));
+			err.f("duplicate field name '%s' for fields %d and %d",
+				name.c_str(), (int)i+1, (int)(idmap_[name])+1);
 		} else {
 			idmap_[name] = i;
 		}
 
 		const Type *t = fields_[i].type_;
 		if (!t->isSimple()) {
-			err->appendMsg(true, strprintf("field '%s' type must be a simple type",
-				name.c_str()));
+			err.f("field '%s' type must be a simple type", name.c_str());
 		} else if(t->getTypeId() == TT_VOID) {
-			err->appendMsg(true, strprintf("field '%s' type must not be void",
-				name.c_str()));
+			err.f("field '%s' type must not be void", name.c_str());
 		}
 	}
 
-	if (err->isEmpty())
-		err = NULL; // if no errors, save space
 	return err;
 }
 

@@ -1,5 +1,5 @@
 //
-// (C) Copyright 2011-2012 Sergey A. Babkin.
+// (C) Copyright 2011-2013 Sergey A. Babkin.
 // This file is a part of Triceps.
 // See the file COPYRIGHT for the copyright notice and license information
 //
@@ -33,6 +33,14 @@ public:
 		rhOffset_(0) // a placeholder value
 	{ }
 
+	// Constructor for tableCopy().
+	// This is called with an initialized argument and produces an
+	// initialized copy.
+	SortedIndexCondition(const SortedIndexCondition *other, Table *t) :
+		TreeIndexType::Less(other, t),
+		rhOffset_(other->rhOffset_)
+	{ }
+
 	// Will be called at the table type initialization time.
 	// By default does nothing.
 	//
@@ -43,6 +51,10 @@ public:
 	virtual void initialize(Erref &errors, TableType *tabtype, SortedIndexType *indtype);
 
 	// from TreeIndexType::Less
+	//
+	// Redefine this method to create a per-Index copy with Table link.
+	// virtual TreeIndexType::Less *tableCopy(Table *t) const;
+	//
 	// Redefine this method to perform the actual comparison of Less.
 	// Must return true if r1 is less than r2, false if r1 ir greater or equal to r2.
 	// virtual bool operator() (const RowHandle *r1, const RowHandle *r2) const = 0;
@@ -83,6 +95,26 @@ public:
 	// and if it keeps the initialization flag, make the copy
 	// un-initialized.
 	virtual SortedIndexCondition *copy() const = 0;
+
+	// Deep-copy the condition object by calling the copy constructor,
+	// nicely cloning the row types. It also comes handy for the Perl
+	// indexes to re-compile the code snippets in the new thread, because
+	// the major reason for this call is for importing the table types
+	// through a nexus to another thread.
+	//
+	// The defalult implementation just calls copy() since most simple index
+	// conditions would not have any row types nor any Perl snippets.
+	//
+	// If redefined, the typical implementation is like this:
+	// IndexType *MySortCondition::copy(HoldRowTypes *holder) const
+	// {
+	//     return new MySortCondition(*this, holder);
+	// }
+	//
+	// The copy constructor should follow the common IndexType convention,
+	// and if it keeps the initialization flag, make the copy
+	// un-initialized.
+	virtual SortedIndexCondition *deepCopy(HoldRowTypes *holder) const;
 	
 public:
 	// The rest of virtual functions are not =0 and don't have to be redefined.
@@ -178,7 +210,8 @@ public:
 
 	// from IndexType
 	virtual const_Onceref<NameSet> getKey() const;
-	virtual IndexType *copy() const;
+	virtual IndexType *copy(bool flat = false) const;
+	virtual IndexType *deepCopy(HoldRowTypes *holder) const;
 	virtual void initialize();
 	virtual Index *makeIndex(const TableType *tabtype, Table *table) const;
 	virtual void initRowHandleSection(RowHandle *rh) const;
@@ -186,8 +219,10 @@ public:
 	virtual void copyRowHandleSection(RowHandle *rh, const RowHandle *fromrh) const;
 
 protected:
-	// used by copy(), deep-copies sc_
-	SortedIndexType(const SortedIndexType &orig);
+	// used by copy(), copies sc_
+	SortedIndexType(const SortedIndexType &orig, bool flat);
+	// used by deepCopy(), deep-copies sc_
+	SortedIndexType(const SortedIndexType &orig, HoldRowTypes *holder);
 
 protected:
 	Autoref<SortedIndexCondition> sc_; // the code that handles the user specifics

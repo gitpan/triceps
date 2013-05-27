@@ -1,5 +1,5 @@
 #
-# (C) Copyright 2011-2012 Sergey A. Babkin.
+# (C) Copyright 2011-2013 Sergey A. Babkin.
 # This file is a part of Triceps.
 # See the file COPYRIGHT for the copyright notice and license information
 #
@@ -15,7 +15,7 @@
 use ExtUtils::testlib;
 
 use Test;
-BEGIN { plan tests => 200 };
+BEGIN { plan tests => 173 };
 use Triceps;
 use Carp;
 ok(1); # If we made it this far, we're ok.
@@ -134,8 +134,8 @@ ok(ref $beforeAcct3, "Triceps::Label");
 $inacct3 = $vu3->makeDummyLabel($ttAccounts->rowType(), "inacct3");
 ok(ref $inacct3, "Triceps::Label");
 
-ok($inacct3->chain($beforeAcct3));
-ok($inacct3->chain($tAccounts3->getInputLabel()));
+$inacct3->chain($beforeAcct3);
+$inacct3->chain($tAccounts3->getInputLabel());
 
 # duplicate the rows for the accounts-dup
 
@@ -145,7 +145,7 @@ my $inacctDup = $vu3->makeLabel($tAccounts3->getRowType(), "inacctDup", undef, s
 	$vu3->call($newrop);
 });
 ok(ref $inacctDup, "Triceps::Label");
-ok($inacct3->chain($inacctDup));
+$inacct3->chain($inacctDup);
 
 # the incoming transactions table here adds an extra id field
 @defTrans3 = ( # a transaction received
@@ -199,29 +199,29 @@ ok(ref $intrans3p, "Triceps::Label");
 # a common label for feeding input data for both transaction tables
 $labtrans3 = $vu3->makeDummyLabel($rtTrans3, "input3");
 ok(ref $labtrans3, "Triceps::Label");
-ok($labtrans3->chain($intrans3));
-ok($labtrans3->chain($intrans3p));
+$labtrans3->chain($intrans3);
+$labtrans3->chain($intrans3p);
 
 # for debugging, collect the table results
 my $res_acct;
 my $labAccounts3 = $vu3->makeLabel($tAccounts3->getRowType(), "labAccounts3", undef, sub { $res_acct .= $_[1]->printP() . "\n" } );
 ok(ref $labAccounts3, "Triceps::Label");
-ok($tAccounts3->getOutputLabel()->chain($labAccounts3));
+$tAccounts3->getOutputLabel()->chain($labAccounts3);
 
 my $res_acct_dup;
 my $labAccounts3dup = $vu3->makeLabel($tAccounts3->getRowType(), "labAccounts3dup", undef, sub { $res_acct_dup .= $_[1]->printP() . "\n" } );
 ok(ref $labAccounts3dup, "Triceps::Label");
-ok($tAccounts3dup->getOutputLabel()->chain($labAccounts3dup));
+$tAccounts3dup->getOutputLabel()->chain($labAccounts3dup);
 
 my $res_trans;
 my $labTrans3 = $vu3->makeLabel($tTrans3->getRowType(), "labTrans3", undef, sub { $res_trans .= $_[1]->printP() . "\n" } );
 ok(ref $labTrans3, "Triceps::Label");
-ok($tTrans3->getOutputLabel()->chain($labTrans3));
+$tTrans3->getOutputLabel()->chain($labTrans3);
 
 my $res_transp;
 my $labTrans3p = $vu3->makeLabel($tTrans3p->getRowType(), "labTrans3p", undef, sub { $res_transp .= $_[1]->printP() . "\n" } );
 ok(ref $labTrans3p, "Triceps::Label");
-ok($tTrans3p->getOutputLabel()->chain($labTrans3p));
+$tTrans3p->getOutputLabel()->chain($labTrans3p);
 
 ################################################################
 # functions that wrap the join creation and wiring
@@ -234,7 +234,7 @@ sub wirejoin($$) # (name, join)
 
 	my $outlab = $vu3->makeLabel($join->getResultRowType(), "out$name", undef, sub { $result{$name} .= $_[1]->printP() . "\n" } );
 	ok(ref $outlab, "Triceps::Label") || confess "label creation failed";
-	ok($join->getOutputLabel()->chain($outlab));
+	$join->getOutputLabel()->chain($outlab);
 }
 
 ################################################################
@@ -291,14 +291,14 @@ wirejoin("3c", Triceps::JoinTwo->new(
 	type => "left",
 ));
 
-# right - with leaf index on left
+# right - with leaf index on left, and indexes looked up automatically from byLeft,
 # and along the way test an explicit "byLeft"
 wirejoin("3d", Triceps::JoinTwo->new(
 	name => "join3d",
 	leftTable => $tTrans3p,
 	rightTable => $tAccounts3,
-	leftIdxPath => ["byAccount"],
-	rightIdxPath => ["lookupSrcExt"],
+	# leftIdxPath => ["byAccount"],
+	# rightIdxPath => ["lookupSrcExt"],
 	leftFields => undef, # copy all
 	rightFields => [ '.*/ac_$&' ], # copy all with prefix ac_
 	fieldsUniqKey => "none",
@@ -1099,10 +1099,6 @@ ok($@ =~ /^Option 'name' must be specified for class 'Triceps::JoinTwo'/);
 ok($@ =~ /^Option 'leftTable' must be specified for class 'Triceps::JoinTwo'/);
 &tryMissingOptValue("rightTable");
 ok($@ =~ /^Option 'rightTable' must be specified for class 'Triceps::JoinTwo'/);
-&tryMissingOptValue("leftIdxPath");
-ok($@ =~ /^Option 'leftIdxPath' must be specified for class 'Triceps::JoinTwo'/);
-&tryMissingOptValue("rightIdxPath");
-ok($@ =~ /^Option 'rightIdxPath' must be specified for class 'Triceps::JoinTwo'/);
 
 sub tryBadOptValue # (optName, optValue, ...)
 {
@@ -1114,7 +1110,11 @@ sub tryBadOptValue # (optName, optValue, ...)
 		rightIdxPath => ["lookupSrcExt"],
 	);
 	while ($#_ >= 1) {
-		$opt{$_[0]} = $_[1];
+		if (defined $_[1]) {
+			$opt{$_[0]} = $_[1];
+		} else {
+			delete $opt{$_[0]};
+		}
 		shift; shift;
 	}
 	eval {
@@ -1146,6 +1146,11 @@ ok($@ =~ /^Option 'byLeft' of class 'Triceps::JoinTwo' must be a reference to 'A
 ok($@ =~ /^Option 'leftSaveJoinerTo' of class 'Triceps::JoinTwo' must be a reference to a scalar, is ''/);
 &tryBadOptValue(rightSaveJoinerTo => 9);
 ok($@ =~ /^Option 'rightSaveJoinerTo' of class 'Triceps::JoinTwo' must be a reference to a scalar, is ''/);
+
+&tryBadOptValue("leftIdxPath" => undef);
+ok($@, qr/^Option 'leftIdxPath' must be present if both 'by' and 'byLeft' are absent at/);
+&tryBadOptValue("rightIdxPath" => undef);
+ok($@, qr/^Option 'rightIdxPath' must be present if both 'by' and 'byLeft' are absent at/);
 
 &tryBadOptValue(
 	by => [ "acctSrc", "source", "acctXtrId", "external" ],
@@ -1429,3 +1434,4 @@ ok($@ =~ /^Unknown value 'xxx' of option 'fieldsUniqKey', must be one of none|ma
 	$vu3->clearLabels();
 	ok(!exists $join->{unit});
 }
+

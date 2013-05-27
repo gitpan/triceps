@@ -1,19 +1,17 @@
 //
-// (C) Copyright 2011-2012 Sergey A. Babkin.
+// (C) Copyright 2011-2013 Sergey A. Babkin.
 // This file is a part of Triceps.
 // See the file COPYRIGHT for the copyright notice and license information
 //
 // The "wrapper" that stores the AggregatorContext data.
 
+#ifndef __TricepsPerl_WrapAggregatorContext_h__
+#define __TricepsPerl_WrapAggregatorContext_h__
+
 #include <common/Conf.h>
 #include <type/AggregatorType.h>
 #include <sched/AggregatorGadget.h>
 #include <table/Aggregator.h>
-
-// ###################################################################################
-
-#ifndef __TricepsPerl_WrapAggregatorContext_h__
-#define __TricepsPerl_WrapAggregatorContext_h__
 
 using namespace TRICEPS_NS;
 

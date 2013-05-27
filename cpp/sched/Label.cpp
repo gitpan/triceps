@@ -1,5 +1,5 @@
 //
-// (C) Copyright 2011-2012 Sergey A. Babkin.
+// (C) Copyright 2011-2013 Sergey A. Babkin.
 // This file is a part of Triceps.
 // See the file COPYRIGHT for the copyright notice and license information
 //
@@ -39,7 +39,7 @@ const string &Label::getUnitName() const
 	return cleared_? placeholderUnitName : unit_->getName();
 }
 
-Erref Label::chain(Onceref<Label> lab)
+Erref Label::chain(Onceref<Label> lab, bool front)
 {
 	assert(this != NULL);
 	assert(!lab.isNull());
@@ -66,7 +66,16 @@ Erref Label::chain(Onceref<Label> lab)
 		return err;
 	}
 
-	chained_.push_back(lab);
+	if (front && !chained_.empty()) {
+		// free space in the front by shifting all the contents
+		chained_.push_back(chained_.back());
+		for (int i = chained_.size() - 2; i > 0; i--)
+			chained_[i] = chained_[i-1];
+		// and then prepend the new reference
+		chained_[0] = lab;
+	} else {
+		chained_.push_back(lab);
+	}
 	return NULL;
 }
 
@@ -100,8 +109,8 @@ void Label::call(Unit *unit, Rowop *arg, const Label *chainedFrom) const
 		return;
 
 	if (unit != unit_) {
-		throw Exception(strprintf("Triceps API violation: call() attempt with unit '%s' of label '%s' belonging to unit '%s'.\n", 
-			unit->getName().c_str(), getName().c_str(), unit_->getName().c_str()), true);
+		throw Exception::fTrace("Triceps API violation: call() attempt with unit '%s' of label '%s' belonging to unit '%s'.\n", 
+			unit->getName().c_str(), getName().c_str(), unit_->getName().c_str());
 	}
 
 	if (nonReentrant_ && recursion_ >= 1)
@@ -127,7 +136,7 @@ void Label::call(Unit *unit, Rowop *arg, const Label *chainedFrom) const
 		execute(arg);
 	} catch (Exception e) {
 		Erref err = e.getErrors();
-		err->appendMsg(true, strprintf("Called through the label '%s'.", getName().c_str()));
+		err.f("Called through the label '%s'.", getName().c_str());
 		throw; // the errors buffer got changed in place!
 	}
 	if (!chained_.empty()) {
@@ -141,7 +150,7 @@ void Label::call(Unit *unit, Rowop *arg, const Label *chainedFrom) const
 				(*it)->call(unit, arg, this); // each of them can do their own chaining....
 			} catch (Exception e) {
 				Erref err = e.getErrors();
-				err->appendMsg(true, strprintf("Called chained from the label '%s'.", getName().c_str()));
+				err.f("Called chained from the label '%s'.", getName().c_str());
 				throw; // the errors buffer got changed in place!
 			}
 		}

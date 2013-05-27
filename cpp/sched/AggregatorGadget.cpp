@@ -1,5 +1,5 @@
 //
-// (C) Copyright 2011-2012 Sergey A. Babkin.
+// (C) Copyright 2011-2013 Sergey A. Babkin.
 // This file is a part of Triceps.
 // See the file COPYRIGHT for the copyright notice and license information
 //
@@ -20,5 +20,12 @@ AggregatorGadget::AggregatorGadget(const AggregatorType *type, Table *table, Ind
 	type_(type),
 	indexType_(intype)
 { }
+
+void AggregatorGadget::sendDelayed(Tray *dest, FdataVec &data, Rowop::Opcode opcode) const
+{
+	if (mode_ != EM_IGNORE) {
+		Gadget::sendDelayed(dest, label_->getType()->makeRow(data), opcode);
+	}
+}
 
 }; // TRICEPS_NS

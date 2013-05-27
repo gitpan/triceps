@@ -1,5 +1,5 @@
 #
-# (C) Copyright 2011-2012 Sergey A. Babkin.
+# (C) Copyright 2011-2013 Sergey A. Babkin.
 # This file is a part of Triceps.
 # See the file COPYRIGHT for the copyright notice and license information
 #
@@ -75,6 +75,8 @@ if (0) {
 # Module for querying the table, version 1: no conditions.
 
 package Query1;
+
+sub CLONE_SKIP { 1; }
 
 sub new # ($class, $table, $name)
 {
@@ -178,6 +180,8 @@ ok(&getResultLines(), $expectQuery1);
 
 package TableQuery2;
 use Carp;
+
+sub CLONE_SKIP { 1; }
 
 sub new # ($class, $unit, $tabType, $name)
 {
@@ -320,6 +324,8 @@ window.response,OP_NOP,,,,
 
 package Query3;
 
+sub CLONE_SKIP { 1; }
+
 sub new # ($class, $optionName => $optionValue ...)
 {
 	my $class = shift;
@@ -405,6 +411,8 @@ ok(&getResultLines(), $expectQuery1);
 
 package Query4;
 use Carp;
+
+sub CLONE_SKIP { 1; }
 
 sub new # ($class, $optionName => $optionValue ...)
 {
@@ -593,6 +601,8 @@ qWindow.out,OP_NOP,,,,
 
 package Query5;
 use Carp;
+
+sub CLONE_SKIP { 1; }
 
 sub new # ($class, $optionName => $optionValue ...)
 {
@@ -817,6 +827,8 @@ qWindow.out,OP_NOP,,,,
 package Query6;
 use Carp;
 
+sub CLONE_SKIP { 1; }
+
 sub new # ($class, $optionName => $optionValue ...)
 {
 	my $class = shift;
@@ -1006,6 +1018,8 @@ qWindow.out,OP_NOP,,,,
 
 package Query7;
 
+sub CLONE_SKIP { 1; }
+
 sub new # ($class, $optionName => $optionValue ...)
 {
 	my $class = shift;
@@ -1095,7 +1109,7 @@ my $srvout = $uTrades->makeLabel($query->getOutputLabel()->getType(),
 	$query->getOutputLabel()->getName() . ".serverOut", undef, sub {
 		&Triceps::X::SimpleServer::outCurBuf($_[1]->printP() . "\n");
 	});
-$query->getOutputLabel()->chain($srvout) or confess "$!";
+$query->getOutputLabel()->chain($srvout);
 
 my %dispatch;
 $dispatch{$tWindow->getName()} = $tWindow->getInputLabel();
@@ -1128,6 +1142,8 @@ qWindow.out OP_NOP
 
 package ServerOutput;
 use Carp;
+
+sub CLONE_SKIP { 1; }
 
 # Sending of rows to the server output.
 sub new # ($class, $option => $value, ...)
@@ -1167,7 +1183,7 @@ sub new # ($class, $option => $value, ...)
 	);
 	$self->{inLabel} = $lb;
 	if (defined $fromLabel) {
-		$fromLabel->chain($lb) or confess "$!";
+		$fromLabel->chain($lb);
 	}
 
 	bless $self, $class;
@@ -1222,8 +1238,7 @@ my $srvout = ServerOutput->new(
 	unit => $uTrades,
 	rowType => $tWindow->getRowType(),
 );
-$query->getOutputLabel()->chain($srvout->getInputLabel())
-	or confess "$!";
+$query->getOutputLabel()->chain($srvout->getInputLabel());
 
 my %dispatch;
 $dispatch{$tWindow->getName()} = $tWindow->getInputLabel();
@@ -1255,6 +1270,8 @@ out,OP_NOP,,,,
 
 package ServerOutput2;
 use Carp;
+
+sub CLONE_SKIP { 1; }
 
 # Sending of rows to the server output.
 sub new # ($class, $option => $value, ...)
@@ -1296,7 +1313,7 @@ sub new # ($class, $option => $value, ...)
 	);
 	$self->{inLabel} = $lb;
 	if (defined $fromLabel) {
-		$fromLabel->chain($lb) or confess "$!";
+		$fromLabel->chain($lb);
 	}
 
 	bless $self, $class;
@@ -1354,8 +1371,7 @@ my $srvout = ServerOutput2->new(
 	unit => $uTrades,
 	rowType => $tWindow->getRowType(),
 );
-$query->getOutputLabel()->chain($srvout->getInputLabel())
-	or confess "$!";
+$query->getOutputLabel()->chain($srvout->getInputLabel());
 
 my %dispatch;
 $dispatch{$tWindow->getName()} = $tWindow->getInputLabel();

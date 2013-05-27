@@ -1,5 +1,5 @@
 #
-# (C) Copyright 2011-2012 Sergey A. Babkin.
+# (C) Copyright 2011-2013 Sergey A. Babkin.
 # This file is a part of Triceps.
 # See the file COPYRIGHT for the copyright notice and license information
 #
@@ -15,7 +15,7 @@
 use ExtUtils::testlib;
 
 use Test;
-BEGIN { plan tests => 121 };
+BEGIN { plan tests => 123 };
 use Triceps;
 ok(1); # If we made it this far, we're ok.
 
@@ -209,6 +209,10 @@ $res = $it1->match($it2);
 ok($res, 0);
 $res = $it2->print();
 ok($res, "index HashedIndex(a, b, ) {\n  index HashedIndex(c, d, ) {\n    index FifoIndex() level3,\n  } level2,\n}");
+
+my $flat2 = $it2->flatCopy();
+ok(ref $flat2, "Triceps::IndexType");
+ok($flat2->isLeaf());
 
 @res = $it2->getSubIndexes();
 ok($#res, 1);

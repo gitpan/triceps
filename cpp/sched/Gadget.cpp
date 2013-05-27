@@ -1,5 +1,5 @@
 //
-// (C) Copyright 2011-2012 Sergey A. Babkin.
+// (C) Copyright 2011-2013 Sergey A. Babkin.
 // This file is a part of Triceps.
 // See the file COPYRIGHT for the copyright notice and license information
 //
@@ -68,8 +68,7 @@ void Gadget::sendDelayed(Tray *dest, const Row *row, Rowop::Opcode opcode) const
 
 	if (mode_ != EM_IGNORE) {
 		Autoref<Rowop> rop = new Rowop(label_, opcode, row, mode_);
-		if (mode_ != EM_IGNORE)
-			dest->push_back(rop);
+		dest->push_back(rop);
 	}
 }
 

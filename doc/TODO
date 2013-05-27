@@ -1,6 +1,9 @@
 Things that need to be done:
+* check the labels for belonging to a right unit when enqueueing?
+* in Rowop construction replace asserts with exceptions
 * redo the errors to confess
 * change the typemap to confess
+* remove the enqueueing mode in Rowops, and in Unit::enqueueDelayedTray(), and in table output
 * more features for the SimpleAggregator
  ** standard deviation can be done in one pass
  ** median and percentiles on sorted indexes
@@ -36,6 +39,9 @@ Things that need to be done:
 * in Tray handle the undefs and NULLs better (see XXX)
 * rewrite makeLoop* with a Loop object
 * make the Perl tracer with row contents a standard Triceps object
+* support the row printing in Unit::Tracer in Perl similar to C++
+* in Perl move the print() and such to the base tracer
+* add the Perl interface for Errors?
 * in the C++-underlying-Perl objects have a place to keep $self,
   with $obj->getSelf()->{CLASS} containing the blessing.
 * when printing table types and such, make sure to \-escape the funny characters
@@ -76,19 +82,50 @@ Things that need to be done:
   pre-existing tables, then disable thsi mode and continue with the subscription
 * add an override of the printed label name in print(), printP() and code 
   that constructs labels around it
+* in BasicAggregator add a storage for one previous result row (or make a separate
+  type with it)
+* export the AggregatorType::setRowType() to Perl initialization
+* transient thread: after it exits, delete it and its nexuses
+* adopt a nexus from another app, for inter-app communication
+* when a thread in a fragment aborts, shut down and abort only that fragment
+* get rid of periods at the end of error messages
+* support arbitrary Perl interruptors for the threads
+* a structured option-based way to build a Table
+* a structured option-based way to build a Label (or maybe better a Compute
+  element with an input and output Label)
+* generalize a way to describe the building of a row type from other
+  row types, like the joins do, to be shared by Joins and Compute
+* maybe there is a point to import nexuses for neither reading nor writing,
+  purely for type definitions (currently they are imported as writers)
+* finish implementing Perl AggregatorType::make, setRowType, setConstructor, setHandler
+* in all placess allow the source code snippets instead of the Perl function references
+* T::Reflector - forwards all data from one nexus to another, a way to have a shared
+  bus that is read-writable to all the threads; or maybe add a special case for
+  importing a reverse facet for both reading and writing
+* in TrieadOwner::nextXtray allow a timeout
+* in ThreadedClient allow a timeout, and return 0 on expect on unexpected EOF
+  or timeout
 
 * doc: the SQLy way, refer to the filtering example in sc_joins_lookup_manual
 
-* doc: the Exception::f, ::fTrace
-* doc: errefAppend()
-* doc: streaming functions
 * doc: perl Label::isCleared()
 * doc: in types construction throw instead of abort()
-* doc: the templates for initialize(), initializeOrThrow(), checkOrThrow()
-* doc: the new draining of forked rowops, new mark semantics
+* doc: HoldRowTypes
+* doc: RowType::copy(), RowSetType::deepCopy()
+* doc: TableType, AggregatorType && IndexType ::deepCopy and copy constructor with holder; 
+* doc: Autoref::swap()
+* doc: RowType::isRowEmpty()
+* doc: croak() in typemap, it croak nicely, with a stack trace
+* doc: the "*" placeholder in Opt, Opt::drop, Opt::dropExcept
+* doc: FnReturn::isFaceted() in Perl
+* doc: Label::makeChained() in Perl
+* doc: how index comparators can return errors through table->setStickyError()
+* doc: in docbook update the source code produced by SimpleAggregator
+* doc: flat copying of indexes (C++ and Perl)
 
 App ideas:
 * queries on CSV files - already done in DBD::CSV?
 * distributed cron
 * data cache
+* the challenges from http://www.orgs.ttu.edu/debs2013/
 

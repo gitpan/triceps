@@ -1,5 +1,5 @@
 #
-# (C) Copyright 2011-2012 Sergey A. Babkin.
+# (C) Copyright 2011-2013 Sergey A. Babkin.
 # This file is a part of Triceps.
 # See the file COPYRIGHT for the copyright notice and license information
 #
@@ -10,7 +10,9 @@ use strict;
 
 package Triceps::X::SimpleServer;
 
-our $VERSION = 'v1.0.91';
+sub CLONE_SKIP { 1; }
+
+our $VERSION = 'v1.0.92';
 
 use Carp;
 use Errno qw(EINTR EAGAIN);
@@ -25,6 +27,18 @@ our %EXPORT_TAGS = ( 'all' => [ qw(
 ) ] );
 
 our @EXPORT_OK = ( @{ $EXPORT_TAGS{'all'} } );
+
+# For whatever reason, Linux signals SIGPIPE when writing on a closed
+# socket (and it's not a pipe). So intercept it.
+sub interceptSigPipe
+{
+	if (!$SIG{PIPE}) {
+		$SIG{PIPE} = sub {};
+	}
+}
+
+# and intercept SIGPIPE by default on import
+&interceptSigPipe();
 
 #########################
 # The server infrastructure
@@ -184,8 +198,10 @@ sub mainLoop # ($srvsock, $%labels)
 			while($inbufs{$id} =~ s/^(.*)\n//) {
 				my $line = $1;
 				chomp $line;
-				local $/ = "\r"; # take care of a possible CR-LF
-				chomp $line;
+				{
+					local $/ = "\r"; # take care of a possible CR-LF in this block
+					chomp $line;
+				}
 				my @data = split(/,/, $line);
 				my $lname = shift @data;
 				my $label = $labels->{$lname};
@@ -298,7 +314,7 @@ sub makeServerOutLabel # ($fromLabel)
 				&Triceps::opcodeString($_[1]->getOpcode()),
 				$_[1]->getRow()->toArray()) . "\n");
 		});
-	$fromLabel->chain($lbOut) or confess "$!";
+	$fromLabel->chain($lbOut);
 	return $lbOut;
 }
 

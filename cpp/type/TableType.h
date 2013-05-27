@@ -1,5 +1,5 @@
 //
-// (C) Copyright 2011-2012 Sergey A. Babkin.
+// (C) Copyright 2011-2013 Sergey A. Babkin.
 // This file is a part of Triceps.
 // See the file COPYRIGHT for the copyright notice and license information
 //
@@ -19,6 +19,7 @@ namespace TRICEPS_NS {
 class Table;
 class RootIndexType;
 class AggregatorType;
+class HoldRowTypes;
 
 class TableType : public Type
 {
@@ -32,6 +33,25 @@ public:
 		return new TableType(rt);
 	}
 	~TableType();
+
+	// Copy this type, copying the contents but sharing the row types.
+	// The copy is also uninitialized. The errors will not be copied.
+	TableType *copy();
+
+	// Create a copy of the type, also copying all the contents including the row types.
+	// The copy is also uninitialized. The errors will not be copied.
+	//
+	// Here there is no use in the holder having the default of NULL
+	// because it would produce something seriously undesirable.
+	// Just use copy() instead if you don't need the deepness.
+	//
+	// @param holder - helper object that makes sure that multiple
+	//        references to the same row type stay multiple references
+	//        to the same copied row type, not multiple row types
+	//        (unless it's NULL, which reverts to plain copying).
+	//        The caller has to keep a reference to the holder for
+	//        the duration.
+	TableType *deepCopy(HoldRowTypes *holder);
 
 	// from Type
 	virtual Erref getErrors() const; 

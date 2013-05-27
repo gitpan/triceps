@@ -1,13 +1,31 @@
 #
-# (C) Copyright 2011-2012 Sergey A. Babkin.
+# (C) Copyright 2011-2013 Sergey A. Babkin.
 # This file is a part of Triceps.
 # See the file COPYRIGHT for the copyright notice and license information
 #
-package Triceps;
 
 use 5.008000;
 use strict;
 use warnings;
+
+# This function must be outside the package.
+sub _Triceps_eval_ {
+	# print "DBG code:\n$_[0]\n";
+	my $c = eval $_[0];
+	# print "DBG compiled $c\n";
+	# print "DBG error $@\n";
+	die $@ if ($@);
+	return $c;
+}
+
+package main;
+
+# Triceps uses SIGUSR2 to interrupt the threads reading from file descriptors,
+# so start by setting a dummy handler on it. It gets inherited by all the threads.
+$SIG{USR2} = sub {};
+
+package Triceps;
+
 use Carp;
 
 require Exporter;
@@ -32,7 +50,7 @@ our @EXPORT = qw(
 	
 );
 
-our $VERSION = 'v1.0.91';
+our $VERSION = 'v1.0.92';
 
 sub AUTOLOAD {
     # This AUTOLOAD is used to 'autoload' constants from the constant()
@@ -67,6 +85,11 @@ sub _compareNumber {
 	$_[0] <=> $_[1];
 }
 
+# flie close called from the C++ code
+sub _close {
+	close($_[0]);
+}
+
 # The default label clearing code.
 # Undefines all the values referred to by the reference arguments.
 # Then undefines all the arguments.
@@ -90,6 +113,11 @@ sub clearArgs
 	}
 }
 
+# The default thread joining code, by the thread id.
+sub joinTid {
+	threads->object($_[0])->join();
+};
+
 require XSLoader;
 XSLoader::load('Triceps', $VERSION);
 
@@ -112,6 +140,9 @@ require Triceps::SimpleAggregator;
 require Triceps::Collapse;
 require Triceps::LookupJoin;
 require Triceps::JoinTwo;
+require Triceps::Triead;
+require Triceps::TrieadOwner;
+require Triceps::App;
 # The X subpackages contain the eXperimental, eXample, eXtraneous code.
 require Triceps::X::SimpleServer;
 require Triceps::X::DumbClient;
@@ -123,6 +154,7 @@ require Triceps::X::Tql;
 # The special variables.
 our $_CROAK_MSG; # used to temporarily store the croak message in the XS code
 our $_DEFAULT_CLEAR_LABEL = \&clearArgs; # used if the label's clear function is undef
+our $_JOIN_TID = \&joinTid; # used in the PerlTrieadJoin for harvesting
 
 1;
 __END__

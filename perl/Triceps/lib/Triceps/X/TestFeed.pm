@@ -1,5 +1,5 @@
 #
-# (C) Copyright 2011-2012 Sergey A. Babkin.
+# (C) Copyright 2011-2013 Sergey A. Babkin.
 # This file is a part of Triceps.
 # See the file COPYRIGHT for the copyright notice and license information
 #
@@ -10,7 +10,9 @@ use strict;
 
 package Triceps::X::TestFeed;
 
-our $VERSION = 'v1.0.91';
+sub CLONE_SKIP { 1; }
+
+our $VERSION = 'v1.0.92';
 
 use Carp;
 
@@ -84,7 +86,7 @@ sub makePrintLabel($$) # ($print_label_name, $parent_label)
 		undef, sub { # (label, rowop)
 			&send($_[1]->printP(), "\n");
 		}) or confess "$!";
-	$lbParent->chain($lb) or confess "$!";
+	$lbParent->chain($lb);
 	return $lb;
 }
 

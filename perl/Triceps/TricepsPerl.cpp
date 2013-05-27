@@ -1,5 +1,5 @@
 //
-// (C) Copyright 2011-2012 Sergey A. Babkin.
+// (C) Copyright 2011-2013 Sergey A. Babkin.
 // This file is a part of Triceps.
 // See the file COPYRIGHT for the copyright notice and license information
 //
@@ -99,6 +99,16 @@ void croakIfSet()
 	}
 }
 
+void croakWithMsg(const char *msg)
+{
+	{
+		setCroakMsg(msg);
+	}
+	croakIfSet();
+	// if something failed, as a last resort croak without the stack trace
+	Perl_croak(aTHX_ "%s", msg);
+}
+
 void clearErrMsg()
 {
 	{
@@ -134,7 +144,7 @@ void setErrMsg(const std::string &msg)
 		warn("Triceps: can not set $! with error: %s", msg.c_str());
 	}
 
-	// in case if the function checks for exceptions, check the corak message too
+	// in case if the function checks for exceptions, check the croak message too
 	// XXX in the future there will probably be just exceptions, no setErrMsg()
 	setCroakMsg(msg);
 }
@@ -483,6 +493,18 @@ void GetSvString(string &res, SV *svptr, const char *fmt, ...)
 	STRLEN slen;
 	char *nn = SvPV(svptr, slen);
 	res.assign(nn, slen);
+}
+
+IV GetSvInt(SV *svptr, const char *fmt, ...)
+{
+	if (!SvIOK(svptr)) {
+		va_list ap;
+		va_start(ap, fmt);
+		string s = vstrprintf(fmt, ap);
+		va_end(ap);
+		throw Exception(strprintf("%s value must be an int", s.c_str()), false);
+	}
+	return SvIV(svptr);
 }
 
 AV *GetSvArray(SV *svptr, const char *fmt, ...)

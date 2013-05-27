@@ -1,5 +1,5 @@
 //
-// (C) Copyright 2011-2012 Sergey A. Babkin.
+// (C) Copyright 2011-2013 Sergey A. Babkin.
 // This file is a part of Triceps.
 // See the file COPYRIGHT for the copyright notice and license information
 //
@@ -58,20 +58,36 @@ void UnitFrame::dropFromList(FrameMark *what)
 
 ///////////////////////////// Unit::Tracer //////////////////////////////////
 
+Unit::Tracer::Tracer(RowPrinter *rp):
+	rowPrinter_(rp),
+	buffer_(new Errors)
+{ }
+
 Unit::Tracer::~Tracer()
 { }
 
-///////////////////////////// Unit::StringTracer //////////////////////////////////
+void Unit::Tracer::printRow(string &res, const RowType *rt, const Row *row)
+{
+	if (rowPrinter_)
+		rowPrinter_(res, rt, row);
+}
 
-Unit::StringTracer::StringTracer(bool verbose) :
-	buffer_(new Errors),
-	verbose_(verbose)
-{ }
-
-void Unit::StringTracer::clearBuffer()
+void Unit::Tracer::clearBuffer()
 {
 	buffer_ = new Errors;
 }
+
+Erref Unit::Tracer::getBuffer()
+{
+	return buffer_;
+}
+
+///////////////////////////// Unit::StringTracer //////////////////////////////////
+
+Unit::StringTracer::StringTracer(bool verbose, RowPrinter *rp) :
+	Tracer(rp),
+	verbose_(verbose)
+{ }
 
 void Unit::StringTracer::execute(Unit *unit, const Label *label, const Label *fromLabel, Rowop *rop, TracerWhen when)
 {
@@ -86,6 +102,7 @@ void Unit::StringTracer::execute(Unit *unit, const Label *label, const Label *fr
 		res.append(strprintf("(chain %p '%s') ", fromLabel, fromLabel->getName().c_str()));
 	};
 	res.append(strprintf("op %p %s", rop, Rowop::opcodeString(rop->getOpcode()) ));
+	printRow(res,  label->getType(), rop->getRow());
 
 	if (verbose_) {
 		if (Unit::tracerWhenIsBefore(when))
@@ -95,13 +112,12 @@ void Unit::StringTracer::execute(Unit *unit, const Label *label, const Label *fr
 	}
 
 	buffer_->appendMsg(false, res);
-	// XXX print the row too?
 }
 
 ///////////////////////////// Unit::StringNameTracer //////////////////////////////////
 
-Unit::StringNameTracer::StringNameTracer(bool verbose) :
-	StringTracer(verbose)
+Unit::StringNameTracer::StringNameTracer(bool verbose, RowPrinter *rp) :
+	StringTracer(verbose, rp)
 { }
 
 void Unit::StringNameTracer::execute(Unit *unit, const Label *label, const Label *fromLabel, Rowop *rop, TracerWhen when)
@@ -119,6 +135,7 @@ void Unit::StringNameTracer::execute(Unit *unit, const Label *label, const Label
 	};
 	res.append("op ");
 	res.append(Rowop::opcodeString(rop->getOpcode()));
+	printRow(res,  label->getType(), rop->getRow());
 
 	if (verbose_) {
 		if (Unit::tracerWhenIsBefore(when))
@@ -128,8 +145,6 @@ void Unit::StringNameTracer::execute(Unit *unit, const Label *label, const Label
 	}
 
 	buffer_->appendMsg(false, res);
-	
-	// XXX print the row too?
 }
 
 ///////////////////////////// Unit //////////////////////////////////
@@ -237,7 +252,7 @@ void Unit::enqueue(int em, Onceref<Rowop> rop)
 	case Gadget::EM_IGNORE:
 		break;
 	default:
-		throw Exception(strprintf("Triceps API violation: Invalid enqueueing mode %d\n", em), true);
+		throw Exception::fTrace("Triceps API violation: Invalid enqueueing mode %d\n", em);
 		break;
 	}
 }
@@ -257,7 +272,7 @@ void Unit::enqueueTray(int em, const_Onceref<Tray> tray)
 	case Gadget::EM_IGNORE:
 		break;
 	default:
-		throw Exception(strprintf("Triceps API violation: Invalid enqueueing mode %d\n", em), true);
+		throw Exception::fTrace("Triceps API violation: Invalid enqueueing mode %d\n", em);
 		break;
 	}
 }
@@ -294,8 +309,8 @@ void Unit::loopAt(FrameMark *mark, Onceref<Rowop> rop)
 		outerFrame_->push_back(rop);
 	} else {
 		if (mark->getUnit() != this) {
-			throw Exception(strprintf("Triceps API violation: loopAt() attempt on unit '%s' with mark '%s' from unit '%s'\n", 
-				getName().c_str(), mark->getName().c_str(), mark->getUnit()->getName().c_str()), true);
+			throw Exception::fTrace("Triceps API violation: loopAt() attempt on unit '%s' with mark '%s' from unit '%s'\n", 
+				getName().c_str(), mark->getName().c_str(), mark->getUnit()->getName().c_str());
 		}
 		f->push_back(rop);
 	}
@@ -309,8 +324,8 @@ void Unit::loopTrayAt(FrameMark *mark, const_Onceref<Tray> tray)
 		f = outerFrame_;
 	} else {
 		if (mark->getUnit() != this) {
-			throw Exception(strprintf("Triceps API violation: loopTrayAt() attempt on unit '%s' with mark '%s' from unit '%s'\n", 
-				getName().c_str(), mark->getName().c_str(), mark->getUnit()->getName().c_str()), true);
+			throw Exception::fTrace("Triceps API violation: loopTrayAt() attempt on unit '%s' with mark '%s' from unit '%s'\n", 
+				getName().c_str(), mark->getName().c_str(), mark->getUnit()->getName().c_str());
 		}
 	}
 	for (Tray::const_iterator it = tray->begin(); it != tray->end(); ++it)

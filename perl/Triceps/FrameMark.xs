@@ -1,5 +1,5 @@
 //
-// (C) Copyright 2011-2012 Sergey A. Babkin.
+// (C) Copyright 2011-2013 Sergey A. Babkin.
 // This file is a part of Triceps.
 // See the file COPYRIGHT for the copyright notice and license information
 //
@@ -15,6 +15,13 @@
 
 MODULE = Triceps::FrameMark		PACKAGE = Triceps::FrameMark
 ###################################################################################
+
+int
+CLONE_SKIP(...)
+	CODE:
+		RETVAL = 1;
+	OUTPUT:
+		RETVAL
 
 void
 DESTROY(WrapFrameMark *self)
@@ -44,5 +51,16 @@ getName(WrapFrameMark *self)
 	OUTPUT:
 		RETVAL
 
-# FrameMark is a token object, so there is not much to do with it
+#// check whether both refs point to the same object
+int
+same(WrapFrameMark *self, WrapFrameMark *other)
+	CODE:
+		clearErrMsg();
+		FrameMark *mark = self->get();
+		FrameMark *omark = other->get();
+		RETVAL = (mark == omark);
+	OUTPUT:
+		RETVAL
+
+#// FrameMark is a token object, so there is not much to do with it
 

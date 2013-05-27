@@ -1,5 +1,5 @@
 //
-// (C) Copyright 2011-2012 Sergey A. Babkin.
+// (C) Copyright 2011-2013 Sergey A. Babkin.
 // This file is a part of Triceps.
 // See the file COPYRIGHT for the copyright notice and license information
 //
@@ -43,16 +43,26 @@ public:
 	}
 
 	// Get back the aggregation type
-	const AggregatorType* getType() const
+	const AggregatorType *getType() const
 	{
 		return type_;
 	}
+	// version with embedded type-casting
+	template<class C>
+	const C *typeAs() const
+	{
+		return static_cast<const C*>(type_.get());
+	}
 
-	// export the sendDeplayed() interface
+	// export the sendDelayed() interface
 	void sendDelayed(Tray *dest, const Row *row, Rowop::Opcode opcode) const
 	{
 		Gadget::sendDelayed(dest, row, opcode);
 	}
+
+	// a convenience version of sendDelayed() that constructs the
+	// row from fields and sends it
+	void sendDelayed(Tray *dest, FdataVec &data, Rowop::Opcode opcode) const;
 
 protected:
 	Table *table_;

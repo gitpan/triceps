@@ -1,5 +1,5 @@
 #
-# (C) Copyright 2011-2012 Sergey A. Babkin.
+# (C) Copyright 2011-2013 Sergey A. Babkin.
 # This file is a part of Triceps.
 # See the file COPYRIGHT for the copyright notice and license information
 #
@@ -7,7 +7,9 @@
 
 package Triceps::Collapse;
 
-our $VERSION = 'v1.0.91';
+sub CLONE_SKIP { 1; }
+
+our $VERSION = 'v1.0.92';
 
 use Carp;
 use strict;
@@ -89,8 +91,8 @@ sub new # ($class, $optName => $optValue, ...)
 			
 	# chain the input label, if any
 	if (defined $lbFrom) {
-		$lbFrom->chain($dataset->{lbIn})
-			or confess "Collapse internal error: input label chaining for dataset '" . $dataset->{name} . "' to '" . $lbFrom->getName() . "' failed:\n$! ";
+		$lbFrom->chain($dataset->{lbIn});
+		# or confess "Collapse internal error: input label chaining for dataset '" . $dataset->{name} . "' to '" . $lbFrom->getName() . "' failed:\n$! ";
 		delete $dataset->{fromLabel}; # no need to keep the reference any more, avoid a reference cycle
 	}
 

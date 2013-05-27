@@ -1,5 +1,5 @@
 //
-// (C) Copyright 2011-2012 Sergey A. Babkin.
+// (C) Copyright 2011-2013 Sergey A. Babkin.
 // This file is a part of Triceps.
 // See the file COPYRIGHT for the copyright notice and license information
 //
@@ -30,5 +30,12 @@ WrapMagic magicWrapAutoFnBind = { "AuFnBnd" };
 WrapMagic magicWrapTable = { "Table" };
 WrapMagic magicWrapIndex = { "Index" };
 WrapMagic magicWrapRowHandle = { "RowHand" };
+
+WrapMagic magicWrapApp = { "App" };
+WrapMagic magicWrapTrieadOwner = { "TrOwner" };
+WrapMagic magicWrapTriead = { "Triead" };
+WrapMagic magicWrapFacet = { "Facet" };
+WrapMagic magicWrapNexus = { "Nexus" };
+WrapMagic magicWrapAutoDrain = { "AuDrain" };
 
 }; // TRICEPS_NS

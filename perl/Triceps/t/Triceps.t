@@ -1,5 +1,5 @@
 #
-# (C) Copyright 2011-2012 Sergey A. Babkin.
+# (C) Copyright 2011-2013 Sergey A. Babkin.
 # This file is a part of Triceps.
 # See the file COPYRIGHT for the copyright notice and license information
 #
@@ -15,7 +15,7 @@
 use ExtUtils::testlib;
 
 use Test;
-BEGIN { plan tests => 126 };
+BEGIN { plan tests => 129 };
 use Triceps;
 ok(1); # If we made it this far, we're ok.
 
@@ -168,9 +168,19 @@ ok(!&Triceps::tracerWhenIsAfter(&Triceps::TW_BEFORE));
 ok(&Triceps::tracerWhenIsAfter(&Triceps::TW_AFTER));
 
 #########################
+# test of time
+
+my $t1 = Triceps::now();
+my $t2 = time();
+ok(int($t1) <= $t2);
+ok($t2 - $t1 < 1);
+
+#########################
 # clearArgs
 
 package ttt;
+
+sub CLONE_SKIP { 1; }
 
 sub new
 {
@@ -208,3 +218,16 @@ ok(!defined $scalar);
 ok(!(@array));
 ok(!(%hash));
 ok(!exists $rclasscopy->{a});
+
+#########################
+# croaking with stack trace on object conversion
+
+sub sub1 {
+	Triceps::Unit::schedule(9);
+}
+sub sub2 {
+	&sub1;
+}
+
+eval { &sub2; };
+ok($@, qr/^Triceps::Unit::schedule\(\): self is not a blessed SV reference to WrapUnitPtr at \S+ line \d+\n\tmain::sub1 called at \S+ line \d+\n\tmain::sub2 called at \S+ line \d+\n\teval {...} called at \S+ line \d+/);

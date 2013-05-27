@@ -1,5 +1,5 @@
 //
-// (C) Copyright 2011-2012 Sergey A. Babkin.
+// (C) Copyright 2011-2013 Sergey A. Babkin.
 // This file is a part of Triceps.
 // See the file COPYRIGHT for the copyright notice and license information
 //
@@ -55,6 +55,11 @@ void SortedIndexCondition::copyRowHandleSection(RowHandle *rh, const RowHandle *
 	new(rs) TreeIndexType::BasicRhSection(*fromrs);
 }
 
+SortedIndexCondition *SortedIndexCondition::deepCopy(HoldRowTypes *holder) const
+{
+	return copy();
+}
+
 //////////////////////////// SortedIndexType /////////////////////////
 
 SortedIndexType::SortedIndexType(Onceref<SortedIndexCondition> sc) :
@@ -64,9 +69,14 @@ SortedIndexType::SortedIndexType(Onceref<SortedIndexCondition> sc) :
 	assert(sc_.get() != NULL);
 }
 
-SortedIndexType::SortedIndexType(const SortedIndexType &orig) :
-	TreeIndexType(orig),
+SortedIndexType::SortedIndexType(const SortedIndexType &orig, bool flat) :
+	TreeIndexType(orig, flat),
 	sc_(orig.sc_->copy())
+{ }
+
+SortedIndexType::SortedIndexType(const SortedIndexType &orig, HoldRowTypes *holder) :
+	TreeIndexType(orig, holder),
+	sc_(orig.sc_->deepCopy(holder))
 { }
 
 bool SortedIndexType::equals(const Type *t) const
@@ -117,9 +127,14 @@ const_Onceref<NameSet> SortedIndexType::getKey() const
 	return sc_->getKey();
 }
 
-IndexType *SortedIndexType::copy() const
+IndexType *SortedIndexType::copy(bool flat) const
 {
-	return new SortedIndexType(*this);
+	return new SortedIndexType(*this, flat);
+}
+
+IndexType *SortedIndexType::deepCopy(HoldRowTypes *holder) const
+{
+	return new SortedIndexType(*this, holder);
 }
 
 void SortedIndexType::initialize()
@@ -145,10 +160,14 @@ Index *SortedIndexType::makeIndex(const TableType *tabtype, Table *table) const
 	if (!isInitialized() 
 	|| errors_->hasError())
 		return NULL; 
+
+	// give the index a custom copy of the comparator that can report
+	// errors to the table
+	TreeIndexType::Less *less = sc_->tableCopy(table);
 	if (nested_.empty())
-		return new TreeIndex(tabtype, table, this, sc_);
+		return new TreeIndex(tabtype, table, this, less);
 	else
-		return new TreeNestedIndex(tabtype, table, this, sc_);
+		return new TreeNestedIndex(tabtype, table, this, less);
 }
 
 void SortedIndexType::initRowHandleSection(RowHandle *rh) const

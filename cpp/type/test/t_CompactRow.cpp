@@ -1,5 +1,5 @@
 //
-// (C) Copyright 2011-2012 Sergey A. Babkin.
+// (C) Copyright 2011-2013 Sergey A. Babkin.
 // This file is a part of Triceps.
 // See the file COPYRIGHT for the copyright notice and license information
 //
@@ -10,6 +10,7 @@
 #include <string.h>
 
 #include <type/AllTypes.h>
+#include <type/HoldRowTypes.h>
 #include <common/StringUtil.h>
 
 // Make fields of all simple types
@@ -55,6 +56,10 @@ UTESTCASE rowtype(Utest *utest)
 	UT_ASSERT(rt2->equals(rt1));
 	UT_ASSERT(rt1->match(rt2));
 	UT_ASSERT(rt2->match(rt1));
+
+	Autoref<RowType> rt1cp = rt1->copy();
+	UT_ASSERT(rt1cp->getErrors().isNull());
+	UT_ASSERT(rt1->equals(rt1cp));
 
 	fld[0].name_ = "aa";
 	Autoref<RowType> rt3 = rt1->newSameFormat(fld);
@@ -138,6 +143,7 @@ UTESTCASE x_data(Utest *utest)
 	fd1.push_back(Fdata(true, &v_string, sizeof(v_string)));
 
 	Rowref r1(rt1,  rt1->makeRow(fd1));
+	UT_ASSERT(!rt1->isRowEmpty(r1));
 
 	Rowref r2(rt1,  fd1);
 
@@ -169,6 +175,10 @@ UTESTCASE x_data(Utest *utest)
 	fd4.push_back(fdtmp);
 
 	Rowref r4(rt4,  fd4);
+
+	FdataVec fd5; // all empty
+	Rowref r5(rt1,  fd5);
+	UT_ASSERT(rt1->isRowEmpty(r5));
 }
 
 UTESTCASE parse_err(Utest *utest)
@@ -461,4 +471,43 @@ UTESTCASE equal(Utest *utest)
 	UT_ASSERT(rt1->equalRows(r1, r2));
 	UT_ASSERT(!rt1->equalRows(r1, r3));
 	UT_ASSERT(!rt1->equalRows(r3, r4));
+}
+
+
+UTESTCASE hold_row_types(Utest *utest)
+{
+	RowType::FieldVec fld;
+	mkfields(fld);
+
+	Autoref<RowType> rt1 = new CompactRowType(fld);
+	if (UT_ASSERT(rt1->getErrors().isNull())) return;
+	Autoref<RowType> rt2 = new CompactRowType(fld);
+	if (UT_ASSERT(rt2->getErrors().isNull())) return;
+
+	Autoref<HoldRowTypes> hrt1 = new HoldRowTypes;
+
+	Autoref<RowType> cp1 = hrt1->copy(rt1);
+	UT_ASSERT(!cp1.isNull());
+	UT_ASSERT(cp1 != rt1);
+
+	Autoref<RowType> cp2 = hrt1->copy(rt2);
+	UT_ASSERT(!cp2.isNull());
+	UT_ASSERT(cp2 != rt2);
+	UT_ASSERT(cp2 != cp1);
+
+	Autoref<RowType> cp3 = hrt1->copy(rt1);
+	UT_IS(cp1, cp3);
+
+	Autoref<RowType> cp4 = hrt1->copy(NULL); // a NULL begets NULL
+	UT_ASSERT(cp4.isNull());
+
+	Autoref<HoldRowTypes> hrt2 = NULL; // a NULL holder causes dumb copies
+
+	Autoref<RowType> cp5 = hrt2->copy(rt1);
+	UT_ASSERT(!cp5.isNull());
+	UT_ASSERT(cp5 != rt1);
+	Autoref<RowType> cp6 = hrt2->copy(rt1);
+	UT_ASSERT(!cp6.isNull());
+	UT_ASSERT(cp6 != rt1);
+	UT_ASSERT(cp6 != cp5);
 }

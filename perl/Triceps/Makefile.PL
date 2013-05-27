@@ -34,7 +34,7 @@ WriteMakefile(
     ($] >= 5.005 ?     ## Add these new keywords supported since 5.005
       (ABSTRACT_FROM  => 'lib/Triceps.pm', # retrieve abstract from module
        AUTHOR         => 'Sergey Babkin <babkin@users.sf.net>') : ()),
-    LIBS              => [split(/\s+/, $TRICEPS_XLIB)], # e.g., '-lm'
+    LIBS              => [$TRICEPS_XLIB], # e.g., '-lm'
     DEFINE            => $TRICEPS_CONF, # e.g., '-DHAVE_SOMETHING'
     INC               => '-I../../cpp', # e.g., '-I. -I/usr/include/other'
 	# Un-comment this if you add C files to link with later:
@@ -76,15 +76,27 @@ AggregatorType.o Label.o Unit.o UnitTracer.o IndexType.o: PerlCallback.h
 
 TricepsPerl.o: PerlCallback.h
 
-PerlCallback.o: PerlCallback.h
+PerlCallback.o: PerlCallback.h PerlValue.h
+
+PerlApp.o: PerlApp.h
+
+PerlValue.o: PerlValue.h
+
+TrackedFile.o: TrackedFile.h
 
 PerlAggregator.o: PerlCallback.h PerlAggregator.h WrapAggregatorContext.h
 
 AggregatorContext.o: WrapAggregatorContext.h
 
-FnReturn.o: PerlCallback.h
+TricepsOpt.o: TricepsOpt.h
+
+FnReturn.o: PerlCallback.h TricepsOpt.h
 
 FnBinding.o: PerlCallback.h
+
+App.o: PerlApp.h
+
+TrieadOwner.o: PerlApp.h PerlTrieadJoin.h PerlCallback.h TricepsOpt.h TrackedFile.h
 
 ";
 }

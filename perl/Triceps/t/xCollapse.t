@@ -1,5 +1,5 @@
 #
-# (C) Copyright 2011-2012 Sergey A. Babkin.
+# (C) Copyright 2011-2013 Sergey A. Babkin.
 # This file is a part of Triceps.
 # See the file COPYRIGHT for the copyright notice and license information
 #
@@ -31,8 +31,11 @@ use strict;
 #########################
 
 package MyCollapse;
+
 use Carp;
 use strict;
+
+sub CLONE_SKIP { 1; }
 
 # A constructor to create a Collapse template.
 # It collapses multiple changes on each key into at most one delete and one insert,
@@ -111,8 +114,7 @@ sub new # ($class, $optName => $optValue, ...)
 			
 	# chain the input label, if any
 	if (defined $lbFrom) {
-		$lbFrom->chain($dataset->{lbIn})
-			or confess "Collapse internal error: input label chaining for dataset '" . $dataset->{name} . "' to '" . $lbFrom->getName() . "' failed:\n$! ";
+		$lbFrom->chain($dataset->{lbIn});
 		delete $dataset->{fromLabel}; # no need to keep the reference any more
 	}
 

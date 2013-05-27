@@ -1,5 +1,5 @@
 //
-// (C) Copyright 2011-2012 Sergey A. Babkin.
+// (C) Copyright 2011-2013 Sergey A. Babkin.
 // This file is a part of Triceps.
 // See the file COPYRIGHT for the copyright notice and license information
 //
@@ -140,6 +140,14 @@ Label *FnBinding::getLabel(int idx) const
 	if (idx < 0 || idx >= labels_.size())
 		return NULL;
 	return labels_[idx];
+}
+
+bool FnBinding::isAutoclear(const string &name) const
+{
+	int idx = findLabel(name);
+	if (idx < 0)
+		return false;
+	return autoclear_[idx];
 }
 
 bool FnBinding::equals(const FnBinding *t) const

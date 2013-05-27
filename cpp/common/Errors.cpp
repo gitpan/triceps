@@ -1,5 +1,5 @@
 //
-// (C) Copyright 2011-2012 Sergey A. Babkin.
+// (C) Copyright 2011-2013 Sergey A. Babkin.
 // This file is a part of Triceps.
 // See the file COPYRIGHT for the copyright notice and license information
 //
@@ -140,17 +140,37 @@ void Errors::clear()
 	error_ = false;
 }
 
-bool errefAppend(Erref &ref, const string &msg, Autoref<Errors> clde)
+// ------------------------------------ Erref ----------------------------------
+
+bool Erref::fAppend(Autoref<Errors> clde, const char *fmt, ...)
 {
 	if (!clde->hasError())
 		return false;
 
-	if (ref.isNull())
-		ref = new Errors(msg, clde);
+	va_list ap;
+	va_start(ap, fmt);
+	string msg = vstrprintf(fmt, ap);
+	va_end(ap);
+
+	if (isNull())
+		*this = new Errors(msg, clde);
 	else
-		ref->append(msg, clde);
+		(*this)->append(msg, clde);
 
 	return true;
+}
+
+
+void Erref::f(const char *fmt, ...)
+{
+	va_list ap;
+	va_start(ap, fmt);
+	string msg = vstrprintf(fmt, ap);
+	va_end(ap);
+
+	if (isNull())
+		*this = new Errors;
+	(*this)->appendMultiline(true, msg);
 }
 
 }; // TRICEPS_NS

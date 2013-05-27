@@ -1,5 +1,5 @@
 //
-// (C) Copyright 2011-2012 Sergey A. Babkin.
+// (C) Copyright 2011-2013 Sergey A. Babkin.
 // This file is a part of Triceps.
 // See the file COPYRIGHT for the copyright notice and license information
 //
@@ -20,7 +20,7 @@ bool Exception::abort_ = true;
 bool Exception::enableBacktrace_ = true;
 bool *Exception::__testAbort_ = NULL;
 
-Exception::Exception(Onceref<Errors> err, bool trace) :
+Exception::Exception(Autoref<Errors> err, bool trace) :
 	error_(err)
 {
 	checkTrace(trace);
@@ -34,14 +34,14 @@ Exception::Exception(const string &err, bool trace) :
 	checkAbort();
 }
 
-Exception::Exception(Onceref<Errors> err, const string &msg) :
+Exception::Exception(Autoref<Errors> err, const string &msg) :
 	error_(new Errors(msg, err))
 {
 	checkTrace(false); // really does nothing
 	checkAbort();
 }
 
-Exception::Exception(Onceref<Errors> err, const char *msg) :
+Exception::Exception(Autoref<Errors> err, const char *msg) :
 	error_(new Errors(msg, err))
 {
 	checkTrace(false); // really does nothing
@@ -78,7 +78,7 @@ Exception Exception::fTrace(const char *fmt, ...)
 	return Exception(msg, true);
 }
 
-Exception Exception::f(Onceref<Errors> err, const char *fmt, ...)
+Exception Exception::f(Autoref<Errors> err, const char *fmt, ...)
 {
 	va_list ap;
 	va_start(ap, fmt);
@@ -86,6 +86,16 @@ Exception Exception::f(Onceref<Errors> err, const char *fmt, ...)
 	va_end(ap);
 
 	return Exception(err, msg);
+}
+
+Exception Exception::fTrace(Autoref<Errors> err, const char *fmt, ...)
+{
+	va_list ap;
+	va_start(ap, fmt);
+	string msg = vstrprintf(fmt, ap);
+	va_end(ap);
+
+	return Exception(new Errors(msg, err), true);
 }
 
 Exception Exception::f(const Exception &exc, const char *fmt, ...)

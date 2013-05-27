@@ -1,5 +1,5 @@
 //
-// (C) Copyright 2011-2012 Sergey A. Babkin.
+// (C) Copyright 2011-2013 Sergey A. Babkin.
 // This file is a part of Triceps.
 // See the file COPYRIGHT for the copyright notice and license information
 //
@@ -39,6 +39,29 @@ PerlSortCondition::PerlSortCondition(const PerlSortCondition &other) :
 	name_(other.name_) // name stays the same!
 { }
 
+PerlSortCondition::PerlSortCondition(const PerlSortCondition &other, HoldRowTypes *holder) :
+	cbInitialize_(other.cbInitialize_->deepCopy()), 
+	cbCompare_(other.cbCompare_->deepCopy()),
+	initialized_(false),
+	svRowType_(NULL),
+	tabType_(NULL),
+	name_(other.name_), // name stays the same!
+	hrt_(holder)
+{ }
+
+PerlSortCondition::PerlSortCondition(const PerlSortCondition *other, Table *t) :
+	SortedIndexCondition(other, t),
+	cbInitialize_(other->cbInitialize_), 
+	cbCompare_(other->cbCompare_),
+	initialized_(other->initialized_),
+	svRowType_(other->svRowType_),
+	tabType_(other->tabType_),
+	name_(other->name_)
+{
+	if (svRowType_ != NULL)
+		SvREFCNT_inc(svRowType_);
+}
+
 PerlSortCondition::~PerlSortCondition()
 {
 	if (svRowType_ != NULL)
@@ -50,6 +73,7 @@ bool PerlSortCondition::equals(const SortedIndexCondition *sc) const
 {
 	const PerlSortCondition *psc = dynamic_cast<const PerlSortCondition *>(sc);
 
+	// XXX this means that it may differ before and after initialization
 	return name_ == psc->name_
 		&& callbackEquals(cbInitialize_, psc->cbInitialize_)
 		&& callbackEquals(cbCompare_, psc->cbCompare_);
@@ -59,6 +83,7 @@ bool PerlSortCondition::match(const SortedIndexCondition *sc) const
 {
 	const PerlSortCondition *psc = dynamic_cast<const PerlSortCondition *>(sc);
 
+	// XXX this means that it may differ before and after initialization
 	return callbackEquals(cbInitialize_, psc->cbInitialize_)
 		&& callbackEquals(cbCompare_, psc->cbCompare_);
 }
@@ -73,6 +98,16 @@ void PerlSortCondition::printTo(string &res, const string &indent, const string 
 SortedIndexCondition *PerlSortCondition::copy() const
 {
 	return new PerlSortCondition(*this);
+}
+
+SortedIndexCondition *PerlSortCondition::deepCopy(HoldRowTypes *holder) const
+{
+	return new PerlSortCondition(*this, holder);
+}
+
+TreeIndexType::Less *PerlSortCondition::tableCopy(Table *t) const
+{
+	return new PerlSortCondition(this, t);
 }
 
 bool PerlSortCondition::operator() (const RowHandle *r1, const RowHandle *r2) const
@@ -105,17 +140,23 @@ bool PerlSortCondition::operator() (const RowHandle *r1, const RowHandle *r2) co
 	bool result = false; // the safe default, collapses all keys into one
 
 	if (SvTRUE(ERRSV)) {
-		// Would exit(1) be better?
-		warn("Error in PerlSortedIndex(%s) comparator: %s", 
+		Erref err;
+		err.f("Error in PerlSortedIndex(%s) comparator: %s", 
 			name_.c_str(), SvPV_nolen(ERRSV));
+		// XXX print the source code of comparator is available
+		table_->setStickyError(err);
 	} else if (svrcode == NULL) {
-		// Would exit(1) be better?
-		warn("Error in PerlSortedIndex(%s) comparator: comparator returned no value", 
+		Erref err;
+		err.f("Error in PerlSortedIndex(%s) comparator: comparator returned no value", 
 			name_.c_str());
+		// XXX print the source code of comparator is available
+		table_->setStickyError(err);
 	} else if (!SvIOK(svrcode)) {
-		// Would exit(1) be better?
-		warn("Error in PerlSortedIndex(%s) comparator: comparator returned a non-integer value '%s'", 
+		Erref err;
+		err.f("Error in PerlSortedIndex(%s) comparator: comparator returned a non-integer value '%s'", 
 			name_.c_str(), SvPV_nolen(svrcode));
+		// XXX print the source code of comparator is available
+		table_->setStickyError(err);
 	} else {
 		result = (SvIV(svrcode) < 0); // the Less
 	}
@@ -140,6 +181,23 @@ void PerlSortCondition::initialize(Erref &errors, TableType *tabtype, SortedInde
 	WrapRowType *wrowt = new WrapRowType(const_cast<RowType *>(rt_.get()));
 	svRowType_ = newSV(0);
 	sv_setref_pv(svRowType_, "Triceps::RowType", (void *)wrowt);
+
+	Erref errInit, errComp;
+
+	if (!cbInitialize_.isNull()) {
+		cbInitialize_->initialize(hrt_);
+		errInit = cbInitialize_->getErrors();
+		errors.fAppend(errInit, "PerlSortedIndex(%s) initialize function is not compatible with multithreading:", name_.c_str());
+	}
+	if (!cbCompare_.isNull()) {
+		cbCompare_->initialize(hrt_);
+		errComp = cbCompare_->getErrors();
+		errors.fAppend(errComp, "PerlSortedIndex(%s) compare function is not compatible with multithreading:", name_.c_str());
+	}
+
+	if (errInit->hasError() ||  errComp->hasError()) {
+		return; // no point in going further
+	}
 
 	if (!cbInitialize_.isNull()) {
 		WrapTableType *wtabt = new WrapTableType(tabtype);
@@ -178,6 +236,7 @@ void PerlSortCondition::initialize(Erref &errors, TableType *tabtype, SortedInde
 		errors->appendMsg(true, "the mandatory comparator Perl function is not set by PerlSortedIndex(" + name_ + ")");
 	}
 
+	hrt_ = NULL; // its work is done
 	initialized_ = true;
 }
 

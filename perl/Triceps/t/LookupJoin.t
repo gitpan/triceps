@@ -1,5 +1,5 @@
 #
-# (C) Copyright 2011-2012 Sergey A. Babkin.
+# (C) Copyright 2011-2013 Sergey A. Babkin.
 # This file is a part of Triceps.
 # See the file COPYRIGHT for the copyright notice and license information
 #
@@ -15,7 +15,7 @@
 use ExtUtils::testlib;
 
 use Test;
-BEGIN { plan tests => 260 };
+BEGIN { plan tests => 248 };
 use Triceps;
 ok(1); # If we made it this far, we're ok.
 
@@ -303,12 +303,12 @@ ok(ref $join2ab->getInputLabel(), "Triceps::Label");
 ok(ref $join2ab->getOutputLabel(), "Triceps::Label");
 
 # the output
-ok($join2ab->getOutputLabel()->chain($outlab2b));
+$join2ab->getOutputLabel()->chain($outlab2b);
 
 # this is purely to keep track of the input in the log
 my $inlab2b = $vu2->makeLabel($rtInTrans, "in", undef, sub { $result2 .= $_[1]->printP() . "\n" } );
 ok(ref $inlab2b, "Triceps::Label");
-ok($inlab2b->chain($join2ab->getInputLabel()));
+$inlab2b->chain($join2ab->getInputLabel());
 
 
 ###############################################################
@@ -397,12 +397,12 @@ ok(ref $join2xab->getInputLabel(), "Triceps::Label");
 ok(ref $join2xab->getOutputLabel(), "Triceps::Label");
 
 # the output
-ok($join2xab->getOutputLabel()->chain($outlab2xb));
+$join2xab->getOutputLabel()->chain($outlab2xb);
 
 # this is purely to keep track of the input in the log
 my $inlab2xb = $vu2->makeLabel($rtInTrans, "in", undef, sub { $result2 .= $_[1]->printP() . "\n" } );
 ok(ref $inlab2xb, "Triceps::Label");
-ok($inlab2xb->chain($join2xab->getInputLabel()));
+$inlab2xb->chain($join2xab->getInputLabel());
 
 
 
@@ -457,12 +457,12 @@ ok(ref $join2c->getInputLabel(), "Triceps::Label");
 ok(ref $join2c->getOutputLabel(), "Triceps::Label");
 
 # the output
-ok($join2c->getOutputLabel()->chain($outlab2c));
+$join2c->getOutputLabel()->chain($outlab2c);
 
 # this is purely to keep track of the input in the log
 my $inlab2c = $vu2->makeLabel($rtInTrans, "in", undef, sub { $result2 .= $_[1]->printP() . "\n" } );
 ok(ref $inlab2c, "Triceps::Label");
-ok($inlab2c->chain($join2c->getInputLabel()));
+$inlab2c->chain($join2c->getInputLabel());
 
 undef $result2;
 # feed the data
@@ -545,12 +545,12 @@ my $outlab2d = $vu2->makeLabel($join2d->getResultRowType(), "out", undef, sub { 
 ok(ref $outlab2d, "Triceps::Label");
 
 # the output
-ok($join2d->getOutputLabel()->chain($outlab2d));
+$join2d->getOutputLabel()->chain($outlab2d);
 
 # this is purely to keep track of the input in the log
 my $inlab2d = $vu2->makeLabel($rtInTrans, "in", undef, sub { $result2 .= $_[1]->printP() . "\n" } );
 ok(ref $inlab2d, "Triceps::Label");
-ok($inlab2d->chain($join2d->getInputLabel()));
+$inlab2d->chain($join2d->getInputLabel());
 
 undef $result2;
 # feed the data
@@ -608,12 +608,12 @@ my $outlab2e = $vu2->makeLabel($join2e->getResultRowType(), "out", undef, sub { 
 ok(ref $outlab2e, "Triceps::Label");
 
 # the output
-ok($join2e->getOutputLabel()->chain($outlab2e));
+$join2e->getOutputLabel()->chain($outlab2e);
 
 # this is purely to keep track of the input in the log
 my $inlab2e = $vu2->makeLabel($rtInTrans, "in", undef, sub { $result2 .= $_[1]->printP() . "\n" } );
 ok(ref $inlab2e, "Triceps::Label");
-ok($inlab2e->chain($join2e->getInputLabel()));
+$inlab2e->chain($join2e->getInputLabel());
 
 undef $result2;
 # feed the data
@@ -678,7 +678,7 @@ my $outlab2f = $vu2->makeLabel($join2f->getResultRowType(), "out", undef, sub { 
 ok(ref $outlab2f, "Triceps::Label");
 
 # the output
-ok($join2f->getOutputLabel()->chain($outlab2f));
+$join2f->getOutputLabel()->chain($outlab2f);
 
 undef $result2;
 # feed the data
@@ -711,6 +711,55 @@ in OP_DELETE acctSrc="source2" acctXtrId="ZZZZ" amount="500"
 join2f.out OP_DELETE acctSrc="source2" acctXtrId="ZZZZ" amount="500" 
 ';
 ok($result2, $expect2f);
+
+#########
+# (2g) Use an automatically-found index that is not the first one.
+# The "by" condition is really a weird abuse here, used simple because
+# the types of these fields match.
+
+# this is purely to keep track of the input in the log
+my $inlab2g = $vu2->makeLabel($rtInTrans, "in", undef, sub { $result2 .= $_[1]->printP() . "\n" } );
+ok(ref $inlab2g, "Triceps::Label");
+
+$join2g = Triceps::LookupJoin->new(
+	name => "join2g",
+	leftFromLabel => $inlab2g,
+	rightTable => $tAccounts,
+	byLeft => [ "amount/internal" ],
+	isLeft => 1,
+	automatic => $auto,
+);
+ok(ref $join2g, "Triceps::LookupJoin");
+
+my $outlab2g = $vu2->makeLabel($join2g->getResultRowType(), "out", undef, sub { $result2 .= $_[1]->printP() . "\n" } );
+ok(ref $outlab2g, "Triceps::Label");
+
+# the output
+$join2g->getOutputLabel()->chain($outlab2g);
+
+undef $result2;
+# feed the data
+@incomingData2g = (
+	[ "source1", "999", 1 ], 
+	[ "source2", "ABCD", 2 ], 
+	[ "source3", "ZZZZ", 3 ], 
+);
+&feedInput($inlab2g, &Triceps::OP_INSERT, \@incomingData2g);
+$vu2->drainFrame();
+ok($vu2->empty());
+
+#print STDERR $result2;
+$expect2g = 
+'in OP_INSERT acctSrc="source1" acctXtrId="999" amount="1" 
+join2g.out OP_INSERT acctSrc="source1" acctXtrId="999" amount="1" source="source1" external="999" internal="1" 
+join2g.out OP_INSERT acctSrc="source1" acctXtrId="999" amount="1" source="source2" external="ABCD" internal="1" 
+in OP_INSERT acctSrc="source2" acctXtrId="ABCD" amount="2" 
+join2g.out OP_INSERT acctSrc="source2" acctXtrId="ABCD" amount="2" source="source1" external="2011" internal="2" 
+join2g.out OP_INSERT acctSrc="source2" acctXtrId="ABCD" amount="2" source="source2" external="QWERTY" internal="2" 
+in OP_INSERT acctSrc="source3" acctXtrId="ZZZZ" amount="3" 
+join2g.out OP_INSERT acctSrc="source3" acctXtrId="ZZZZ" amount="3" source="source1" external="42" internal="3" 
+';
+ok($result2, $expect2g);
 
 ###############################################################
 # Now repeat all the same but with fieldsMirrorKey==1, and 
@@ -760,12 +809,12 @@ ok(ref $join2xc->getInputLabel(), "Triceps::Label");
 ok(ref $join2xc->getOutputLabel(), "Triceps::Label");
 
 # the output
-ok($join2xc->getOutputLabel()->chain($outlab2xc));
+$join2xc->getOutputLabel()->chain($outlab2xc);
 
 # this is purely to keep track of the input in the log
 my $inlab2xc = $vu2->makeLabel($rtInTrans, "in", undef, sub { $result2 .= $_[1]->printP() . "\n" } );
 ok(ref $inlab2xc, "Triceps::Label");
-ok($inlab2xc->chain($join2xc->getInputLabel()));
+$inlab2xc->chain($join2xc->getInputLabel());
 
 undef $result2;
 # feed the data
@@ -848,12 +897,12 @@ my $outlab2xd = $vu2->makeLabel($join2xd->getResultRowType(), "out", undef, sub 
 ok(ref $outlab2xd, "Triceps::Label");
 
 # the output
-ok($join2xd->getOutputLabel()->chain($outlab2xd));
+$join2xd->getOutputLabel()->chain($outlab2xd);
 
 # this is purely to keep track of the input in the log
 my $inlab2xd = $vu2->makeLabel($rtInTrans, "in", undef, sub { $result2 .= $_[1]->printP() . "\n" } );
 ok(ref $inlab2xd, "Triceps::Label");
-ok($inlab2xd->chain($join2xd->getInputLabel()));
+$inlab2xd->chain($join2xd->getInputLabel());
 
 undef $result2;
 # feed the data
@@ -911,12 +960,12 @@ my $outlab2xe = $vu2->makeLabel($join2xe->getResultRowType(), "out", undef, sub 
 ok(ref $outlab2xe, "Triceps::Label");
 
 # the output
-ok($join2xe->getOutputLabel()->chain($outlab2xe));
+$join2xe->getOutputLabel()->chain($outlab2xe);
 
 # this is purely to keep track of the input in the log
 my $inlab2xe = $vu2->makeLabel($rtInTrans, "in", undef, sub { $result2 .= $_[1]->printP() . "\n" } );
 ok(ref $inlab2xe, "Triceps::Label");
-ok($inlab2xe->chain($join2xe->getInputLabel()));
+$inlab2xe->chain($join2xe->getInputLabel());
 
 undef $result2;
 # feed the data
@@ -981,7 +1030,7 @@ my $outlab2xf = $vu2->makeLabel($join2xf->getResultRowType(), "out", undef, sub 
 ok(ref $outlab2xf, "Triceps::Label");
 
 # the output
-ok($join2xf->getOutputLabel()->chain($outlab2xf));
+$join2xf->getOutputLabel()->chain($outlab2xf);
 
 undef $result2;
 # feed the data
@@ -1014,6 +1063,55 @@ in OP_DELETE acctSrc="source2" acctXtrId="ZZZZ" amount="500"
 join2xf.out OP_DELETE acctSrc="source2" acctXtrId="ZZZZ" amount="500" source="source2" external="ZZZZ" 
 ';
 ok($result2, $expect2xf);
+
+#########
+# (2xg) same as 2xf, only drop the right-side key instead of mirroring it
+# also test the leftFromLabel here
+
+# this is purely to keep track of the input in the log
+my $inlab2xg = $vu2->makeLabel($rtInTrans, "in", undef, sub { $result2 .= $_[1]->printP() . "\n" } );
+ok(ref $inlab2xg, "Triceps::Label");
+
+$join2xg = Triceps::LookupJoin->new(
+	name => "join2xg",
+	leftFromLabel => $inlab2xg,
+	rightTable => $tAccounts2xde,
+	rightIdxPath => ["lookupSrcExt"],
+	by => [ "acctSrc" => "source", "acctXtrId" => "external" ],
+	isLeft => 1,
+	limitOne => 1,
+	automatic => $auto,
+	fieldsDropRightKey => 1,
+);
+ok(ref $join2xg, "Triceps::LookupJoin");
+
+my $outlab2xg = $vu2->makeLabel($join2xg->getResultRowType(), "out", undef, sub { $result2 .= $_[1]->printP() . "\n" } );
+ok(ref $outlab2xg, "Triceps::Label");
+
+# the output
+$join2xg->getOutputLabel()->chain($outlab2xg);
+
+undef $result2;
+# feed the data
+&feedInput($inlab2xg, &Triceps::OP_INSERT, \@incomingData);
+# no need for a DELETE version
+$vu2->drainFrame();
+ok($vu2->empty());
+
+#print STDERR $result2;
+$expect2xg = 
+'in OP_INSERT acctSrc="source1" acctXtrId="999" amount="100" 
+join2xg.out OP_INSERT acctSrc="source1" acctXtrId="999" amount="100" internal="1" 
+in OP_INSERT acctSrc="source2" acctXtrId="ABCD" amount="200" 
+join2xg.out OP_INSERT acctSrc="source2" acctXtrId="ABCD" amount="200" internal="1" 
+in OP_INSERT acctSrc="source3" acctXtrId="ZZZZ" amount="300" 
+join2xg.out OP_INSERT acctSrc="source3" acctXtrId="ZZZZ" amount="300" 
+in OP_INSERT acctSrc="source1" acctXtrId="2011" amount="400" 
+join2xg.out OP_INSERT acctSrc="source1" acctXtrId="2011" amount="400" internal="2" 
+in OP_INSERT acctSrc="source2" acctXtrId="ZZZZ" amount="500" 
+join2xg.out OP_INSERT acctSrc="source2" acctXtrId="ZZZZ" amount="500" 
+';
+ok($result2, $expect2xg);
 
 }
 
@@ -1276,7 +1374,11 @@ ok($@ =~ /^Triceps::TableType::findIndexKeyPath: the index type at path 'lookupI
 
 {
 	my $tt = Triceps::TableType->new($rtAccounts)
-		->addSubIndex("lookupInt", Triceps::IndexType->newFifo());
+		->addSubIndex("lookupSrcExt", # quick look-up by source and external id
+			Triceps::IndexType->newHashed(key => [ "source", "external" ])
+			->addSubIndex("fifo", Triceps::IndexType->newFifo())
+		)
+	;
 	ok(ref $tt, "Triceps::TableType");
 	$res = $tt->initialize();
 	ok($res, 1);
@@ -1290,12 +1392,12 @@ ok($@ =~ /^Triceps::TableType::findIndexKeyPath: the index type at path 'lookupI
 			leftRowType => $rtInTrans,
 			rightTable => $t,
 			rightFields => [ "internal/acct" ],
-			by => [ "acctSrc" => "source", "acctXtrId" => "external" ],
+			by => [ "acctSrc" => "source", "acctXtrId" => "internal" ], # "internal" is not in the index on the right side
 			isLeft => 1,
 			automatic => 1,
 		);
 	};
-	ok($@ =~ /^The rightTable does not have a top-level Hash index for joining/);
+	ok($@, qr/^The rightTable does not have an index that matches the key set\n  right key: \(source, internal\)\n  by: \(acctSrc, source, acctXtrId, internal\)\n  right table type:\n    table \(\n      row {\n        string source,\n        string external,\n        int32 internal,\n      }\n    \) {\n      index HashedIndex\(source, external, \) {\n        index FifoIndex\(\) fifo,\n      } lookupSrcExt,\n    }\n  at/);
 }
 
 &tryBadOptValue(rightFields => [ "internal/acct", "duck" ]),
@@ -1343,33 +1445,29 @@ ok($@ =~ /^A duplicate field 'acctSrc' is produced from  right-side field 'inter
 	ok(ref $t, "Triceps::Table");
 
 	my $j;
-	$j = eval {
-		Triceps::LookupJoin->new(
-			unit => $vu2,
-			name => "join",
-			leftRowType => $rtInTrans,
-			rightTable => $t,
-			rightFields => [ "notArr1" ],
-			by => [ "acctSrc" => "notArr1" ],
-			isLeft => 1,
-			automatic => 1,
-		);
-	};
+	$j = Triceps::LookupJoin->new(
+		unit => $vu2,
+		name => "join",
+		leftRowType => $rtInTrans,
+		rightTable => $t,
+		rightFields => [ "notArr1" ],
+		by => [ "acctSrc" => "notArr1" ],
+		isLeft => 1,
+		automatic => 1,
+	);
 	ok(ref $j, "Triceps::LookupJoin");
 
-	$j = eval {
-		Triceps::LookupJoin->new(
-			unit => $vu2,
-			name => "join",
-			leftRowType => $rtInTrans,
-			rightTable => $t,
-			rightIdxPath => ["byNotArr2"],
-			rightFields => [ "notArr1" ],
-			by => [ "acctSrc" => "notArr2" ],
-			isLeft => 1,
-			automatic => 1,
-		);
-	};
+	$j = Triceps::LookupJoin->new(
+		unit => $vu2,
+		name => "join",
+		leftRowType => $rtInTrans,
+		rightTable => $t,
+		rightIdxPath => ["byNotArr2"],
+		rightFields => [ "notArr1" ],
+		by => [ "acctSrc" => "notArr2" ],
+		isLeft => 1,
+		automatic => 1,
+	);
 	ok(ref $j, "Triceps::LookupJoin");
 
 	$j = eval {

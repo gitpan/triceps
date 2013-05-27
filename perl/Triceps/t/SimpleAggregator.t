@@ -1,5 +1,5 @@
 #
-# (C) Copyright 2011-2012 Sergey A. Babkin.
+# (C) Copyright 2011-2013 Sergey A. Babkin.
 # This file is a part of Triceps.
 # See the file COPYRIGHT for the copyright notice and license information
 #
@@ -45,7 +45,7 @@ sub runExample($$$) # ($unit, $tabType, $aggName)
 			&send($_[1]->printP(), "\n");
 		}) or confess "$!";
 
-	$lbAgg->chain($lbPrint) or confess "$!";
+	$lbAgg->chain($lbPrint);
 
 	while(&readLine) {
 		chomp;
@@ -572,7 +572,7 @@ tryBadOptValue(
 			symbol => "string", "_defective_syntax", sub {$_[0]->get("symbol");},
 		],
 );
-ok($@ =~ /^Triceps::SimpleAggregator::make: error in compilation of the aggregation computation:/);
+ok($@, qr/^Triceps::SimpleAggregator::make: failed to build an aggregator type: Triceps::AggregatorType::new\(handler\): failed to compile the source code\nCompilation error: Bareword "XXXXXXX" not allowed while "strict subs" in use/);
 
 tryBadOptValue(
 		result => [

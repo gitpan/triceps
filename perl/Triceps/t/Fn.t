@@ -1,5 +1,5 @@
 #
-# (C) Copyright 2011-2012 Sergey A. Babkin.
+# (C) Copyright 2011-2013 Sergey A. Babkin.
 # This file is a part of Triceps.
 # See the file COPYRIGHT for the copyright notice and license information
 #
@@ -15,7 +15,7 @@
 use ExtUtils::testlib;
 
 use Test;
-BEGIN { plan tests => 389 };
+BEGIN { plan tests => 391 };
 use Triceps;
 ok(1); # If we made it this far, we're ok.
 
@@ -73,10 +73,12 @@ my $fret1 = Triceps::FnReturn->new(
 );
 ok(ref $fret1, "Triceps::FnReturn");
 ok($fret1->getName(), "fret1");
+ok(!$fret1->isFaceted()); # see that in TrieadOwner.t
 
-# without explict unit, two labels
+# without explict unit, two labels, chainFront => 0
 my $fret2 = Triceps::FnReturn->new(
 	name => "fret2",
+	chainFront => 0,
 	labels => [
 		one => $lb1,
 		two => $lb2,
@@ -93,6 +95,9 @@ my $fret3 = Triceps::FnReturn->new(
 	]
 );
 ok(ref $fret3, "Triceps::FnReturn");
+
+# check the chaining order 
+ok(join(", ", map {$_->getName()} $lb1->getChain()), "fret3.two, fret1.one, fret2.one");
 
 # a matching one
 my $fret4 = Triceps::FnReturn->new(

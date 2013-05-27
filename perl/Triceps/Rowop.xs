@@ -1,5 +1,5 @@
 //
-// (C) Copyright 2011-2012 Sergey A. Babkin.
+// (C) Copyright 2011-2013 Sergey A. Babkin.
 // This file is a part of Triceps.
 // See the file COPYRIGHT for the copyright notice and license information
 //
@@ -19,13 +19,20 @@ MODULE = Triceps::Rowop		PACKAGE = Triceps::Rowop
 BOOT:
 // fprintf(stderr, "DEBUG Rowop items=%d sp=%p mark=%p\n", items, sp, mark);
 
+int
+CLONE_SKIP(...)
+	CODE:
+		RETVAL = 1;
+	OUTPUT:
+		RETVAL
+
 void
 DESTROY(WrapRowop *self)
 	CODE:
 		// warn("Rowop destroyed!");
 		delete self;
 
-# make a copy of Rowop
+#// make a copy of Rowop
 WrapRowop *
 copy(WrapRowop *self)
 	CODE:
@@ -37,7 +44,7 @@ copy(WrapRowop *self)
 	OUTPUT:
 		RETVAL
 
-# check whether both refs point to the same type object
+#// check whether both refs point to the same type object
 int
 same(WrapRowop *self, WrapRowop *other)
 	CODE:
@@ -57,7 +64,7 @@ getOpcode(WrapRowop *self)
 	OUTPUT:
 		RETVAL
 
-# the static isInsert() etc are in the base Triceps:: class
+#// the static isInsert() etc are in the base Triceps:: class
 
 int
 isInsert(WrapRowop *self)

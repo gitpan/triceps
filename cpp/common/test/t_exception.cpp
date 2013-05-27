@@ -1,5 +1,5 @@
 //
-// (C) Copyright 2011-2012 Sergey A. Babkin.
+// (C) Copyright 2011-2013 Sergey A. Babkin.
 // This file is a part of Triceps.
 // See the file COPYRIGHT for the copyright notice and license information
 //
@@ -133,6 +133,17 @@ UTESTCASE throw_catch(Utest *utest)
 		string what;
 		err->printTo(what);
 		UT_IS(what.find("message\nStack trace:\n  "), 0);
+	}
+
+	try {
+		Erref err = new Errors;
+		err->appendMsg(true, "message");
+		throw Exception::fTrace(err, "wrapper %d", 99);
+	} catch (Exception e) {
+		Erref err = e.getErrors();
+		string what;
+		err->printTo(what);
+		UT_IS(what.find("wrapper 99\n  message\nStack trace:\n  "), 0);
 	}
 
 	// see that the stack trace ges disabled

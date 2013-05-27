@@ -1,5 +1,5 @@
 //
-// (C) Copyright 2011-2012 Sergey A. Babkin.
+// (C) Copyright 2011-2013 Sergey A. Babkin.
 // This file is a part of Triceps.
 // See the file COPYRIGHT for the copyright notice and license information
 //
@@ -27,7 +27,9 @@ public:
 	// @param tabtype - type of table where this index belongs
 	// @param table - the actual table where this index belongs
 	// @param mytype - type that created this index
-	// @param lessop - less functor class for the key, this index assumes is ownership
+	// @param lessop - less functor class for the key, this index will keep a reference
+	//        (it should be a private copy created from the IndexType's functor and knowing
+	//        about the table, if it ever wants to report any errors)
 	TreeNestedIndex(const TableType *tabtype, Table *table, const TreeIndexType *mytype, Less *lessop);
 	~TreeNestedIndex();
 
@@ -58,7 +60,7 @@ protected:
 
 	Set data_; // the data store
 	Autoref<const TreeIndexType> type_; // type of this index
-	Less *less_; // the comparator object, owned by the type
+	Autoref<Less> less_; // the comparator object, index's own copy
 };
 
 }; // TRICEPS_NS

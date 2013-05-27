@@ -1,5 +1,5 @@
 #
-# (C) Copyright 2011-2012 Sergey A. Babkin.
+# (C) Copyright 2011-2013 Sergey A. Babkin.
 # This file is a part of Triceps.
 # See the file COPYRIGHT for the copyright notice and license information
 #
@@ -7,7 +7,9 @@
 
 package Triceps::SimpleOrderedIndex;
 
-our $VERSION = 'v1.0.91';
+sub CLONE_SKIP { 1; }
+
+our $VERSION = 'v1.0.92';
 
 use Carp;
 
@@ -30,7 +32,7 @@ sub new # ($class, $fieldName => $direction...)
 	}
 
 	$self = Triceps::IndexType->newPerlSorted(
-		$sortName, \&init, undef, @args
+		$sortName, '&Triceps::SimpleOrderedIndex::init(@_)', undef, @args
 	) or confess "$!";
 	bless $self, $class;
 	return $self;
@@ -45,7 +47,7 @@ sub init # ($tabt, $idxt, $rowt, @args)
 	my ($tabt, $idxt, $rowt, @args) = @_;
 	my %def = $rowt->getdef(); # the field definition
 	my $errors; # collect as many errors as possible
-	my $compare = "sub {\n"; # the generated comparison function
+	my $compare = ""; # the generated comparison function
 	my $connector = "return"; # what goes between the comparison operators
 
 	while ($#args >= 0) {
@@ -85,22 +87,16 @@ sub init # ($tabt, $idxt, $rowt, @args)
 	}
 
 	$compare .= "  ;\n";
-	$compare .= "}";
 
 	if (defined $errors) {
 		# help with diagnostics, append the row type to the error listing
 		$errors .= "the row type is:\n";
 		$errors .= $rowt->print();
 	} else {
-		# compile the comparison
+		# set the comparison as source code
 		#print STDERR "DEBUG Triceps::SimpleOrderedIndex::init: comparison function:\n$compare\n";
-		my $cmpfunc = eval $compare 
-			or return "Triceps::SimpleOrderedIndex::init: internal error when compiling the compare function:\n"
-				. "$@\n"
-				. "The generated comparator was:\n"
-				. $compare;
-		$idxt->setComparator($cmpfunc)
-			or return "Triceps::SimpleOrderedIndex::init: internal error: can not set the compare function:\n"
+		$idxt->setComparator($compare)
+			or return "Triceps::SimpleOrderedIndex::init: can not set the compare function:\n"
 			. "$!\n";
 	}
 	return $errors;

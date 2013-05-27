@@ -1,5 +1,5 @@
 //
-// (C) Copyright 2011-2012 Sergey A. Babkin.
+// (C) Copyright 2011-2013 Sergey A. Babkin.
 // This file is a part of Triceps.
 // See the file COPYRIGHT for the copyright notice and license information
 //
@@ -74,13 +74,20 @@ void PerlFnContext::call(const FnReturn *fret, PerlCallback *cb, const char *whi
 MODULE = Triceps::FnReturn		PACKAGE = Triceps::FnReturn
 ###################################################################################
 
+int
+CLONE_SKIP(...)
+	CODE:
+		RETVAL = 1;
+	OUTPUT:
+		RETVAL
+
 void
 DESTROY(WrapFnReturn *self)
 	CODE:
 		// warn("FnReturn destroyed!");
 		delete self;
 
-# check whether both refs point to the same object
+#// check whether both refs point to the same object
 int
 same(WrapFnReturn *self, WrapFnReturn *other)
 	CODE:
@@ -91,42 +98,42 @@ same(WrapFnReturn *self, WrapFnReturn *other)
 	OUTPUT:
 		RETVAL
 
-# Args are the option pairs. The options are:
-#
-# name => $name
-# The name of the object.
-#
-# unit => $unit
-# Defines the unit where this FnReturn belongs. If at least one of the labels in
-# this object (see option "labels") is built by chaining from another label,
-# the unit can be implicitly taken from there, and the option "unit" becomes
-# optional. All the labels must belong to the same unit.
-#
-# labels => [ 
-#   name => $rowType,
-#   name => $fromLabel,
-# ]
-# Defines the labels of this return in a referenced array. The array contains
-# the pairs of (label_name, label_definition). The definition may be either
-# a RowType, and then a label of this row type will be created, or a Label,
-# and then a label of the same row type will be created and chained from that
-# original label. The created label objects can be later found, and used
-# like normal labels, by chaining them or sending rowops to them (but
-# chaining _from_ them is probably not the best idea, although it works anyway).
-# At least one definition pair must be present.
-#
-# onPush => $code
-# onPush => [$code, @args]
-# Defines a function and possibly arguments to be executed when a new 
-# FnBinding is pushed onto this return. The function is called:
-#   &$code($thisFnReturn, @args)
-#
-# onPop => $code
-# onPop => [$code, @args]
-# Defines a function and possibly arguments to be executed when a 
-# FnBinding is popped from this return. The function is called:
-#   &$code($thisFnReturn, @args)
-#
+#// Args are the option pairs. The options are:
+#//
+#// name => $name
+#// The name of the object.
+#//
+#// unit => $unit
+#// Defines the unit where this FnReturn belongs. If at least one of the labels in
+#// this object (see option "labels") is built by chaining from another label,
+#// the unit can be implicitly taken from there, and the option "unit" becomes
+#// optional. All the labels must belong to the same unit.
+#//
+#// labels => [ 
+#//   name => $rowType,
+#//   name => $fromLabel,
+#// ]
+#// Defines the labels of this return in a referenced array. The array contains
+#// the pairs of (label_name, label_definition). The definition may be either
+#// a RowType, and then a label of this row type will be created, or a Label,
+#// and then a label of the same row type will be created and chained from that
+#// original label. The created label objects can be later found, and used
+#// like normal labels, by chaining them or sending rowops to them (but
+#// chaining _from_ them is probably not the best idea, although it works anyway).
+#// At least one definition pair must be present.
+#//
+#// onPush => $code
+#// onPush => [$code, @args]
+#// Defines a function and possibly arguments to be executed when a new 
+#// FnBinding is pushed onto this return. The function is called:
+#//   &$code($thisFnReturn, @args)
+#//
+#// onPop => $code
+#// onPop => [$code, @args]
+#// Defines a function and possibly arguments to be executed when a 
+#// FnBinding is popped from this return. The function is called:
+#//   &$code($thisFnReturn, @args)
+#//
 WrapFnReturn *
 new(char *CLASS, ...)
 	CODE:
@@ -134,12 +141,12 @@ new(char *CLASS, ...)
 		Autoref<FnReturn> fretret;
 		clearErrMsg();
 		try {
-			clearErrMsg();
 			int len, i;
 			Unit *u = NULL;
 			AV *labels = NULL;
 			string name;
 			Autoref<PerlCallback> onPush, onPop;
+			bool chainFront = true;
 
 			if (items % 2 != 1) {
 				throw Exception("Usage: Triceps::FnReturn::new(CLASS, optionName, optionValue, ...), option names and values must go in pairs", false);
@@ -157,6 +164,8 @@ new(char *CLASS, ...)
 					onPush = GetSvCall(arg, "%s: option '%s'", funcName, optname);
 				} else if (!strcmp(optname, "onPop")) {
 					onPop = GetSvCall(arg, "%s: option '%s'", funcName, optname);
+				} else if (!strcmp(optname, "chainFront")) {
+					chainFront = SvTRUE(arg);
 				} else {
 					throw Exception(strprintf("%s: unknown option '%s'", funcName, optname), false);
 				}
@@ -165,38 +174,7 @@ new(char *CLASS, ...)
 			// parse and do the basic checks of the labels
 			if (labels == NULL)
 				throw Exception(strprintf("%s: missing mandatory option 'labels'", funcName), false);
-			len = av_len(labels)+1; // av_len returns the index of last element
-			if (len % 2 != 0 || len == 0)
-				throw Exception(strprintf("%s: option 'labels' must contain elements in pairs, has %d elements", funcName, len), false);
-			for (i = 0; i < len; i+=2) {
-				SV *svname, *svval;
-				WrapLabel *wl;
-				WrapRowType *wrt;
-				svname = *av_fetch(labels, i, 0);
-				svval = *av_fetch(labels, i+1, 0);
-
-				if (!SvPOK(svname))
-					throw Exception(strprintf("%s: in option 'labels' element %d name must be a string", funcName, i/2+1), false);
-
-				TRICEPS_GET_WRAP2(Label, wl, RowType, wrt, svval, "%s: in option 'labels' element %d with name '%s'", 
-					funcName, i/2+1, SvPV_nolen(svname));
-
-				if (wl != NULL) {
-					Label *lb = wl->get();
-					Unit *lbu = lb->getUnitPtr();
-
-					if (lbu == NULL)
-						throw Exception(strprintf("%s: a cleared label in option 'labels' element %d with name '%s' can not be used", 
-							funcName, i/2+1, SvPV_nolen(svname)), false);
-
-					if (u == NULL)
-						u = lbu;
-					else if (u != lbu)
-						throw Exception(strprintf(
-							"%s: label in option 'labels' element %d with name '%s' has a mismatching unit '%s', previously seen unit '%s'", 
-							funcName, i/2+1, SvPV_nolen(svname), lbu->getName().c_str(), u->getName().c_str()), false);
-				}
-			}
+			checkLabelList(funcName, "labels", u, labels);
 
 			if (u == NULL)
 				throw Exception(strprintf("%s: the unit can not be auto-deduced, must use an explicit option 'unit'", funcName), false);
@@ -206,28 +184,7 @@ new(char *CLASS, ...)
 			// now finally start building the object
 			Autoref<FnReturn> fret = new FnReturn(u, name);
 
-			len = av_len(labels)+1; // av_len returns the index of last element
-			for (i = 0; i < len; i+=2) {
-				SV *svname, *svval;
-				WrapRowType *wrt;
-				WrapLabel *wl;
-				svname = *av_fetch(labels, i, 0);
-				svval = *av_fetch(labels, i+1, 0);
-
-				string lbname;
-				GetSvString(lbname, svname, "%s: option 'label' element %d name", funcName, i+1);
-
-				TRICEPS_GET_WRAP2(Label, wl, RowType, wrt, svval, "%s: in option 'labels' element %d with name '%s'", 
-					funcName, i/2+1, SvPV_nolen(svname));
-
-				if (wl != NULL) {
-					Label *lb = wl->get();
-					fret->addFromLabel(lbname, lb);
-				} else {
-					RowType *rt = wrt->get();
-					fret->addLabel(lbname, rt);
-				}
-			}
+			addFnReturnLabels(funcName, "labels", u, labels, chainFront, fret);
 
 			if (!onPush.isNull() || !onPop.isNull()) {
 				fret->setContext(new PerlFnContext(onPush, onPop));
@@ -247,7 +204,7 @@ new(char *CLASS, ...)
 		RETVAL
 
 
-# Push the binding onto a return.
+#// Push the binding onto a return.
 void 
 push(WrapFnReturn *self, WrapFnBinding *arg)
 	CODE:
@@ -263,8 +220,8 @@ push(WrapFnReturn *self, WrapFnBinding *arg)
 			}
 		} TRICEPS_CATCH_CROAK;
 
-# Pop the binding from a return. If the binding argument is specfied,
-# this will assert that it's the binding being popped.
+#// Pop the binding from a return. If the binding argument is specfied,
+#// this will assert that it's the binding being popped.
 void 
 pop(WrapFnReturn *self, ...)
 	CODE:
@@ -298,7 +255,7 @@ getName(WrapFnReturn *self)
 	OUTPUT:
 		RETVAL
 
-# Get the stack size.
+#// Get the stack size.
 int 
 bindingStackSize(WrapFnReturn *self)
 	CODE:
@@ -307,8 +264,8 @@ bindingStackSize(WrapFnReturn *self)
 	OUTPUT:
 		RETVAL
 
-# Get the stack contents. Used mostly for diagnostics.
-# Returns an array of FnBindings with the top of stack on the right.
+#// Get the stack contents. Used mostly for diagnostics.
+#// Returns an array of FnBindings with the top of stack on the right.
 SV *
 bindingStack(WrapFnReturn *self)
 	PPCODE:
@@ -325,8 +282,8 @@ bindingStack(WrapFnReturn *self)
 			XPUSHs(bindv);
 		}
 
-# Get the names of bindings in the contents. Useful for printing the contents.
-# Returns an array of strings with the top of stack on the right.
+#// Get the names of bindings in the contents. Useful for printing the contents.
+#// Returns an array of strings with the top of stack on the right.
 SV *
 bindingStackNames(WrapFnReturn *self)
 	PPCODE:
@@ -342,7 +299,7 @@ bindingStackNames(WrapFnReturn *self)
 			XPUSHs(sv_2mortal(newSVpvn(name.c_str(), name.size())));
 		}
 
-# Comparison of the underlying RowSetTypes.
+#// Comparison of the underlying RowSetTypes.
 int
 equals(WrapFnReturn *self, SV *other)
 	CODE:
@@ -377,7 +334,7 @@ match(WrapFnReturn *self, SV *other)
 	OUTPUT:
 		RETVAL
 
-# number of labels in the return
+#// number of labels in the return
 int 
 size(WrapFnReturn *self)
 	CODE:
@@ -386,7 +343,7 @@ size(WrapFnReturn *self)
 	OUTPUT:
 		RETVAL
 
-# get the names of the labels (not of labels themselves but if logical names in return)
+#// get the names of the labels (not of labels themselves but of logical names in return)
 SV *
 getLabelNames(WrapFnReturn *self)
 	PPCODE:
@@ -399,8 +356,8 @@ getLabelNames(WrapFnReturn *self)
 			XPUSHs(sv_2mortal(newSVpvn(names[i].c_str(), names[i].size())));
 		}
 
-# get the actual labels (NOT the ones used as the constructor
-# arguments, these are used for chaining from)
+#// get the actual labels (NOT the ones used as the constructor
+#// arguments, these are used for chaining from)
 SV *
 getLabels(WrapFnReturn *self)
 	PPCODE:
@@ -417,8 +374,8 @@ getLabels(WrapFnReturn *self)
 			XPUSHs(sv_2mortal(sub));
 		}
 
-# get the pairs of (name1, label1, ..., nameN, labelN) in the correct order,
-# and also suitable for the assignment to a hash
+#// get the pairs of (name1, label1, ..., nameN, labelN) in the correct order,
+#// and also suitable for the assignment to a hash
 SV *
 getLabelHash(WrapFnReturn *self)
 	PPCODE:
@@ -437,8 +394,8 @@ getLabelHash(WrapFnReturn *self)
 			XPUSHs(sv_2mortal(sub));
 		}
 
-# get the pairs of (name1, rt1, ..., nameN, rtN) in the correct order,
-# and also suitable for the assignment to a hash
+#// get the pairs of (name1, rt1, ..., nameN, rtN) in the correct order,
+#// and also suitable for the assignment to a hash
 SV *
 getRowTypeHash(WrapFnReturn *self)
 	PPCODE:
@@ -457,7 +414,7 @@ getRowTypeHash(WrapFnReturn *self)
 			XPUSHs(sv_2mortal(sub));
 		}
 
-# get the mapping of the label names to indexes
+#// get the mapping of the label names to indexes
 SV *
 getLabelMapping(WrapFnReturn *self)
 	PPCODE:
@@ -471,7 +428,7 @@ getLabelMapping(WrapFnReturn *self)
 			XPUSHs(sv_2mortal(newSViv(i)));
 		}
 
-# Get a label by name. Confesses on the unknown names.
+#// Get a label by name. Confesses on the unknown names.
 WrapLabel *
 getLabel(WrapFnReturn *self, char *name)
 	CODE:
@@ -489,7 +446,7 @@ getLabel(WrapFnReturn *self, char *name)
 	OUTPUT:
 		RETVAL
 
-# Get a label by index. Confesses on the indexes out of range.
+#// Get a label by index. Confesses on the indexes out of range.
 WrapLabel *
 getLabelAt(WrapFnReturn *self, int idx)
 	CODE:
@@ -507,7 +464,7 @@ getLabelAt(WrapFnReturn *self, int idx)
 	OUTPUT:
 		RETVAL
 
-# Translate a label name to index. Confesses on the unknown names
+#// Translate a label name to index. Confesses on the unknown names
 int
 findLabel(WrapFnReturn *self, char *name)
 	CODE:
@@ -520,3 +477,12 @@ findLabel(WrapFnReturn *self, char *name)
 		} TRICEPS_CATCH_CROAK;
 	OUTPUT:
 		RETVAL
+
+int 
+isFaceted(WrapFnReturn *self)
+	CODE:
+		clearErrMsg();
+		RETVAL = self->get()->isFaceted();
+	OUTPUT:
+		RETVAL
+

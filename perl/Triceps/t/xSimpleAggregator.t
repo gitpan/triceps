@@ -1,5 +1,5 @@
 #
-# (C) Copyright 2011-2012 Sergey A. Babkin.
+# (C) Copyright 2011-2013 Sergey A. Babkin.
 # This file is a part of Triceps.
 # See the file COPYRIGHT for the copyright notice and license information
 #
@@ -33,6 +33,8 @@ ok(1); # If we made it this far, we're ok.
 
 package MySimpleAggregator;
 use Carp;
+
+sub CLONE_SKIP { 1; }
 
 use strict;
 
@@ -393,7 +395,7 @@ sub runExample($$$) # ($unit, $tabType, $aggName)
 			&send($_[1]->printP(), "\n");
 		}) or confess "$!";
 
-	$lbAgg->chain($lbPrint) or confess "$!";
+	$lbAgg->chain($lbPrint);
 
 	while(&readLine) {
 		chomp;

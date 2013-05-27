@@ -1,5 +1,5 @@
 //
-// (C) Copyright 2011-2012 Sergey A. Babkin.
+// (C) Copyright 2011-2013 Sergey A. Babkin.
 // This file is a part of Triceps.
 // See the file COPYRIGHT for the copyright notice and license information
 //
@@ -17,6 +17,13 @@
 
 MODULE = Triceps::Unit		PACKAGE = Triceps::Unit
 ###################################################################################
+
+int
+CLONE_SKIP(...)
+	CODE:
+		RETVAL = 1;
+	OUTPUT:
+		RETVAL
 
 void
 DESTROY(WrapUnit *self)
@@ -38,9 +45,9 @@ Triceps::Unit::new(char *name)
 	OUTPUT:
 		RETVAL
 
-# returns true on success, undef on error;
-# the argument array can be a mix of rowops and trays;
-# on error some of the records may end up enqueued
+#// returns true on success, undef on error;
+#// the argument array can be a mix of rowops and trays;
+#// on error some of the records may end up enqueued
 int
 schedule(WrapUnit *self, ...)
 	CODE:
@@ -57,7 +64,7 @@ schedule(WrapUnit *self, ...)
 	OUTPUT:
 		RETVAL
 
-# see comment for schedule
+#// see comment for schedule
 int
 fork(WrapUnit *self, ...)
 	CODE:
@@ -74,7 +81,7 @@ fork(WrapUnit *self, ...)
 	OUTPUT:
 		RETVAL
 
-# see comment for schedule
+#// see comment for schedule
 int
 call(WrapUnit *self, ...)
 	CODE:
@@ -91,7 +98,7 @@ call(WrapUnit *self, ...)
 	OUTPUT:
 		RETVAL
 
-# see comment for schedule
+#// see comment for schedule
 int
 enqueue(WrapUnit *self, SV *enqMode, ...)
 	CODE:
@@ -112,7 +119,7 @@ enqueue(WrapUnit *self, SV *enqMode, ...)
 	OUTPUT:
 		RETVAL
 
-# work with marks
+#// work with marks
 void
 setMark(WrapUnit *self, WrapFrameMark *wm)
 	CODE:
@@ -124,7 +131,7 @@ setMark(WrapUnit *self, WrapFrameMark *wm)
 			u->setMark(mark);
 		} TRICEPS_CATCH_CROAK;
 
-# see comment for schedule
+#// see comment for schedule
 int
 loopAt(WrapUnit *self, WrapFrameMark *wm, ...)
 	CODE:
@@ -173,16 +180,16 @@ empty(WrapUnit *self)
 	OUTPUT:
 		RETVAL
 
-# Work with the streaming functions: call one or more rowops
-# in a scope of pushed function bindings. Same thing as push the
-# bindings, do the calls, pop the bindings.
-#
-# $unit->callBound( # pushes all the bindings, does the call, pops
-#     $rowop, # or $tray, or [ @rowops ]
-#     $fnr => $bind, ...
-# );
-#
-# Always returns 1, unless it confesses on errors.
+#// Work with the streaming functions: call one or more rowops
+#// in a scope of pushed function bindings. Same thing as push the
+#// bindings, do the calls, pop the bindings.
+#//
+#// $unit->callBound( # pushes all the bindings, does the call, pops
+#//     $rowop, # or $tray, or [ @rowops ]
+#//     $fnr => $bind, ...
+#// );
+#//
+#// Always returns 1, unless it confesses on errors.
 int
 callBound(WrapUnit *self, SV *ops, ...)
 	CODE:
@@ -239,7 +246,7 @@ callBound(WrapUnit *self, SV *ops, ...)
 	OUTPUT:
 		RETVAL
 
-# check whether both refs point to the same object
+#// check whether both refs point to the same object
 int
 same(WrapUnit *self, WrapUnit *other)
 	CODE:
@@ -250,7 +257,7 @@ same(WrapUnit *self, WrapUnit *other)
 	OUTPUT:
 		RETVAL
 
-# operations on unit name
+#// operations on unit name
 char *
 getName(WrapUnit *self)
 	CODE:
@@ -308,7 +315,7 @@ maxRecursionDepth(WrapUnit *self)
 	OUTPUT:
 		RETVAL
 
-# get the empty row type
+#// get the empty row type
 WrapRowType *
 getEmptyRowType(WrapUnit *self)
 	CODE:
@@ -320,7 +327,7 @@ getEmptyRowType(WrapUnit *self)
 	OUTPUT:
 		RETVAL
 
-# operations on tracer
+#// operations on tracer
 WrapUnitTracer *
 getTracer(WrapUnit *self)
 	CODE:
@@ -336,7 +343,7 @@ getTracer(WrapUnit *self)
 	OUTPUT:
 		RETVAL
 
-# use SV* for argument because may pass undef
+#// use SV* for argument because may pass undef
 void
 setTracer(WrapUnit *self, SV *arg)
 	CODE:
@@ -420,7 +427,7 @@ makeTray(WrapUnit *self, ...)
 	OUTPUT:
 		RETVAL
 
-# make a label without any executable code (that is useful for chaining)
+#// make a label without any executable code (that is useful for chaining)
 WrapLabel *
 makeDummyLabel(WrapUnit *self, WrapRowType *wrt, char *name)
 	CODE:
@@ -436,14 +443,14 @@ makeDummyLabel(WrapUnit *self, WrapRowType *wrt, char *name)
 	OUTPUT:
 		RETVAL
 
-# make a label with executable Perl code
-# @param self - unit where the new label belongs
-# @param wrt - row type for the label
-# @param name - name of the label
-# @param clear - the Perl function reference to be called when the label gets cleared,
-#        may be undef
-# @param exec - the Perl function reference for label execution
-# @param ... - extra args used for both clear and exec callbacks
+#// make a label with executable Perl code
+#// @param self - unit where the new label belongs
+#// @param wrt - row type for the label
+#// @param name - name of the label
+#// @param clear - the Perl function reference to be called when the label gets cleared,
+#//        may be undef
+#// @param exec - the Perl function reference for label execution
+#// @param ... - extra args used for both clear and exec callbacks
 WrapLabel *
 makeLabel(WrapUnit *self, WrapRowType *wrt, char *name, SV *clear, SV *exec, ...)
 	CODE:
@@ -475,12 +482,12 @@ makeLabel(WrapUnit *self, WrapRowType *wrt, char *name, SV *clear, SV *exec, ...
 	OUTPUT:
 		RETVAL
 
-# Make a label that does nothing other than clearing of the argument objects.
-# The row type of this label is always the empty row type.
-# Confesses on errors.
-# @param self - unit where the new label belongs
-# @param name - name of the label
-# @param ... -  args used for clearing with Triceps::clearArgs()
+#// Make a label that does nothing other than clearing of the argument objects.
+#// The row type of this label is always the empty row type.
+#// Confesses on errors.
+#// @param self - unit where the new label belongs
+#// @param name - name of the label
+#// @param ... -  args used for clearing with Triceps::clearArgs()
 WrapLabel *
 makeClearingLabel(WrapUnit *self, char *name, ...)
 	CODE:
@@ -511,7 +518,7 @@ makeClearingLabel(WrapUnit *self, char *name, ...)
 		RETVAL
 
 
-# clear the labels, makes the unit non-runnable
+#// clear the labels, makes the unit non-runnable
 void
 clearLabels(WrapUnit *self)
 	CODE:
@@ -521,8 +528,8 @@ clearLabels(WrapUnit *self)
 			unit->clearLabels();
 		} TRICEPS_CATCH_CROAK;
 
-# make a clearing trigger
-# (once it's destroyed, the unit will get cleared!)
+#// make a clearing trigger
+#// (once it's destroyed, the unit will get cleared!)
 WrapUnitClearingTrigger *
 makeClearingTrigger(WrapUnit *self)
 	CODE:
@@ -539,6 +546,13 @@ makeClearingTrigger(WrapUnit *self)
 
 MODULE = Triceps::Unit		PACKAGE = Triceps::UnitClearingTrigger
 ###################################################################################
+
+int
+CLONE_SKIP(...)
+	CODE:
+		RETVAL = 1;
+	OUTPUT:
+		RETVAL
 
 void
 DESTROY(WrapUnitClearingTrigger *self)

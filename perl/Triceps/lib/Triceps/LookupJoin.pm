@@ -1,5 +1,5 @@
 #
-# (C) Copyright 2011-2012 Sergey A. Babkin.
+# (C) Copyright 2011-2013 Sergey A. Babkin.
 # This file is a part of Triceps.
 # See the file COPYRIGHT for the copyright notice and license information
 #
@@ -7,7 +7,9 @@
 
 package Triceps::LookupJoin;
 
-our $VERSION = 'v1.0.91';
+sub CLONE_SKIP { 1; }
+
+our $VERSION = 'v1.0.92';
 
 use Carp;
 
@@ -21,8 +23,11 @@ use strict;
 #    be used for lookup
 # rightTable - table object where to do the look-ups
 # rightIdxPath (optional) - array reference containing the path name of index type 
-#    in table used for look-up (default: first top-level Hash),
-#    index absolutely must be a Hash (leaf or not), not of any other kind
+#    in table used for look-up (default: will be automatically found by the
+#    set of keys specified in "by" or "byLeft", if possible),
+#    index absolutely must be a Hash (leaf or not), not of any other kind;
+#    if the index is not found automatically or the explicitly specified index
+#    doesn't match, it's an error
 # leftFields (optional) - reference to array of patterns for left fields to pass through,
 #    syntax as described in Triceps::Fields::filter(), if not defined then pass everything
 # rightFields (optional) - reference to array of patterns for right fields to pass through,
@@ -35,6 +40,10 @@ use strict;
 #    the key fields from it would still be present in the result by mirroring
 #    them from the left side.
 #    (default: 0) Used by JoinTwo.
+# fieldsDropRightKey (optional) - flag: automatically exclude the right-side key fields
+#    from the result, since they are duplicates of the left side anyway. This is kind of
+#    the opposide of fieldsMirrorKey and nullifies its effect.
+#    (default: 0)
 # by (semi-optional) - reference to array, containing pairs of field names used for look-up,
 #    [ leftFld1, rightFld1, leftFld2, rightFld2, ... ]
 #    XXX should allow an arbitrary expression on the left?
@@ -95,6 +104,7 @@ sub new # (class, optionName => optionValue ...)
 			rightFields => [ undef, sub { &Triceps::Opt::ck_ref(@_, "ARRAY") } ],
 			fieldsLeftFirst => [ 1, undef ],
 			fieldsMirrorKey => [ 0, undef ],
+			fieldsDropRightKey => [ 0, undef ],
 			by => [ undef, sub { &Triceps::Opt::ck_ref(@_, "ARRAY") } ],
 			byLeft => [ undef, sub { &Triceps::Opt::ck_ref(@_, "ARRAY") } ],
 			isLeft => [ 1, undef ],
@@ -184,16 +194,36 @@ sub new # (class, optionName => optionValue ...)
 		my $ixid  = $self->{rightIdxType}->getIndexId();
 		Carp::confess("The index '" . join('.', @{$self->{rightIdxPath}}) . "' is of kind '" . &Triceps::indexIdString($ixid) . "', not the required 'IT_HASHED'")
 			unless ($ixid == &Triceps::IT_HASHED);
-		@idxkeys = sort @idxkeys;
 	} else {
-		$self->{rightIdxType} = $self->{rightTable}->getType()->findSubIndexById(&Triceps::IT_HASHED);
-		Carp::confess("The rightTable does not have a top-level Hash index for joining")
-			unless defined $self->{rightIdxType};
-		@idxkeys = sort $self->{rightIdxType}->getKey();
+		# try to find the index by keys automatically;
+		# start by extracting the right side of "by"
+		my $by = $self->{by};
+		for (my $i = 1; $i <= $#$by; $i+= 2) {
+			push @idxkeys, $by->[$i];
+		}
+		
+		$self->{rightIdxPath} = [ $self->{rightTable}->getType()->findIndexPathForKeys(@idxkeys) ];
+		Carp::confess("The rightTable does not have an index that matches the key set\n  right key: ("
+				. join(", ", @idxkeys) . ")\n  by: ("
+				. join(", ", @{$self->{by}}) . ")\n  right table type:\n    "
+				. $self->{rightTable}->getType()->print("    ") . "\n ")
+			unless $#{$self->{rightIdxPath}} >= 0;
+		$self->{rightIdxType} = $self->{rightTable}->getType()->findIndexPath(@{$self->{rightIdxPath}});
 	}
+	@idxkeys = sort @idxkeys;
 	my %idxkeymap;
 	foreach my $i (@idxkeys) {
 		$idxkeymap{$i} = 1;
+	}
+
+	if ($self->{fieldsDropRightKey}) {
+		if (!defined($self->{rightFields})) {
+			$self->{rightFields} = [ ".*" ]; # the implicit pass-all
+		} else {
+			$self->{rightFields} = [ @{$self->{rightFields}} ]; # copy to avoid changing the original
+		}
+		# exclude by prepending the forbidding patterns
+		unshift(@{$self->{rightFields}}, map("!$_", @idxkeys) );
 	}
 
 	# create the look-up row (and check that "by" contains the correct field names)
@@ -476,8 +506,8 @@ sub new # (class, optionName => optionValue ...)
 	
 	# chain the input label, if any
 	if (defined $self->{leftFromLabel}) {
-		$self->{leftFromLabel}->chain($self->{inputLabel})
-			or confess "$myname internal error: input label chaining to '" . $self->{leftFromLabel}->getName() . "' failed:\n$! ";
+		$self->{leftFromLabel}->chain($self->{inputLabel});
+		# or confess "$myname internal error: input label chaining to '" . $self->{leftFromLabel}->getName() . "' failed:\n$! ";
 		delete $self->{leftFromLabel}; # no need to keep the reference any more, avoid a reference cycle
 	}
 

@@ -1,5 +1,5 @@
 //
-// (C) Copyright 2011-2012 Sergey A. Babkin.
+// (C) Copyright 2011-2013 Sergey A. Babkin.
 // This file is a part of Triceps.
 // See the file COPYRIGHT for the copyright notice and license information
 //
@@ -9,6 +9,7 @@
 #include <type/TableType.h>
 #include <type/RootIndexType.h>
 #include <type/AggregatorType.h>
+#include <type/HoldRowTypes.h>
 #include <table/Table.h>
 #include <common/Exception.h>
 
@@ -23,6 +24,22 @@ TableType::TableType(Onceref<RowType> rt) :
 
 TableType::~TableType()
 { }
+
+TableType *TableType::copy()
+{
+	TableType *cpt = new TableType(rowType_);
+	// replace the root index type with a copy
+	cpt->root_ = (RootIndexType *)root_->copy();
+	return cpt;
+}
+
+TableType *TableType::deepCopy(HoldRowTypes *holder)
+{
+	TableType *cpt = new TableType(holder->copy(rowType_));
+	// replace the root index type with a copy
+	cpt->root_ = (RootIndexType *)root_->deepCopy(holder);
+	return cpt;
+}
 
 TableType *TableType::addSubIndex(const string &name, IndexType *index)
 {
