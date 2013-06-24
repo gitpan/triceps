@@ -7,7 +7,7 @@
 
 package Triceps::Table;
 
-our $VERSION = 'v1.0.92';
+our $VERSION = 'v1.0.93';
 
 use Carp;
 

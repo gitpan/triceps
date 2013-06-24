@@ -12,7 +12,7 @@ package Triceps::X::SimpleServer;
 
 sub CLONE_SKIP { 1; }
 
-our $VERSION = 'v1.0.92';
+our $VERSION = 'v1.0.93';
 
 use Carp;
 use Errno qw(EINTR EAGAIN);

@@ -25,7 +25,7 @@ package Triceps::X::Tql;
 
 sub CLONE_SKIP { 1; }
 
-our $VERSION = 'v1.0.92';
+our $VERSION = 'v1.0.93';
 
 use Carp;
 use Triceps::X::Braced qw(:all);

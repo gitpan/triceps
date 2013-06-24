@@ -7,17 +7,27 @@ TRICEPS_XLIB = -lpthread -lrt
 
 # The NSPR library is a pain. In some distributions it's using the name,
 # including the include directory name "nspr4". In some it's just "nspr".
-# The difference in the include directory is a major pain and gets
-# handled by the setting of TRICEPS_NSPR. If it's not set at all,
-# NSPR won't be used. Instead an alternative portable implementation
-# of atomic integers that uses a mutex will be used.
+# Hopefully, the configuration will be auto-found.
+# You can override it by setting the values explicitly instead.
+# If TRICEPS_NSPR is not set, NSPR won't be used. Instead an alternative
+# portable implementation of atomic integers that uses a mutex will be used.
 #
-# use the NSPR4 library, named as such
-TRICEPS_CONF += -DTRICEPS_NSPR=4
-TRICEPS_XLIB += -lnspr4
-# use the NSPR4 library, named simply "nspr", auto-found
-# TRICEPS_CONF += -DTRICEPS_NSPR=0 $(shell pkg-config --cflags nspr)
-# TRICEPS_XLIB += $(shell pkg-config --libs nspr)
+# The code below tries to do its best to find the NSPR library in the
+# places I know of, or otherwise makes the code do without it.
+# If it doesn't work weel on your system, you can always comment out
+# this code and override it manually.
+NSPR_LIBS = $(shell pkg-config --libs nspr 2>/dev/null)
+ifneq ($(NSPR_LIBS),)
+	# use the NSPR4 library, auto-found
+	TRICEPS_CONF += -DTRICEPS_NSPR $(shell pkg-config --cflags nspr)
+	TRICEPS_XLIB += $(NSPR_LIBS)
+else
+	NSPR_INC = $(shell ls -d /usr/include/nspr4 2>/dev/null)
+	ifneq ($(NSPR_INC),)
+		TRICEPS_CONF += -DTRICEPS_NSPR -I/usr/include/nspr4
+		TRICEPS_XLIB += -lnspr4
+	endif
+endif
 
 # use a different namespace (instead of Triceps)
 # TRICEPS_CONF += -DTRICEPS_NS=name
@@ -32,7 +42,7 @@ OBJEXT := .o
 BINEXT := 
 BUILDDIR := build
 CPPFLAGS := -I.. $(TRICEPS_CONF)
-CFLAGS := -g -fPIC -pthread -rdynamic $(CPPFLAGS) -Wall -Wno-sign-conversion -Wno-sign-compare -Werror $(TRICEPS_CONF)
+CFLAGS := -g -fPIC -pthread -rdynamic $(CPPFLAGS) -Wall -Wno-sign-conversion -Wno-sign-compare -Wno-int-to-pointer-cast -Werror $(TRICEPS_CONF)
 CXXFLAGS := $(CFLAGS)
 LDFLAGS := -L../build -l$(LIBRARY) $(TRICEPS_XLIB)
 TESTLDFLAGS := $(LDFLAGS) -L../utest/build -Wl,-rpath='$$ORIGIN/../../../build' \
