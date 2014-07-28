@@ -7,7 +7,7 @@
 ]>
 
 <!--
-(C) Copyright 2011-2013 Sergey A. Babkin.
+(C) Copyright 2011-2014 Sergey A. Babkin.
 This file is a part of Triceps.
 See the file COPYRIGHT for the copyright notice and license information
 -->
@@ -254,75 +254,30 @@ make_query(w_my, (field_c, field_d));
 		<title>Simple wrapper templates</title>
 
 		<para>
-		The query examples will be using the main loop with sockets from the
+		The SimpleServer package described in
+		<xref linkend="sc_sched_mainloop_socket" xrefstyle="select: label quotedtitle pageabbrev"/>&xrsp;
+		contains templates for the repeating tasks. 
+		<pre>makeExitLabel()</pre> creates a label that will
+		request the server to exit, <pre>makeServerOutLabel()</pre> creates
+		a label that will send the rows from some label back into the socket.
+		</para>
+
+		<para>
+		Rather than copying the code here again, please refer to the description in
 		<xref linkend="sc_sched_mainloop_socket" xrefstyle="select: label quotedtitle pageabbrev"/>&xrsp;.
-		It has two repeating tasks: requesting the socket server to exit, and sending the
-		rows from some label back into the socket. These tasks can be nicely handled
-		with the simple templates:
-		</para>
-
-<!-- t/xQuery.t -->
-<pre>
-package ServerHelpers;
-use Carp;
-
-# Exiting the server.
-sub makeExitLabel # ($unit, $name)
-{
-	my $unit = shift;
-	my $name = shift;
-	return $unit->makeLabel($unit->getEmptyRowType(), $name, undef, sub {
-		$srv_exit = 1;
-	});
-}
-
-# Sending of rows to the server output.
-sub makeServerOutLabel # ($fromLabel)
-{
-	my $fromLabel = shift;
-	my $unit = $fromLabel->getUnit();
-	my $fromName = $fromLabel->getName();
-	my $lbOut = $unit->makeLabel($fromLabel->getType(), 
-		$fromName . ".serverOut", undef, sub {
-			&main::outCurBuf(join(",", $fromName, 
-				&Triceps::opcodeString($_[1]->getOpcode()),
-				$_[1]->getRow()->toArray()) . "\n");
-		});
-	$fromLabel->chain($lbOut) or confess "$!";
-	return $lbOut;
-}
-</pre>
-
-		<para>
-		Each function is a separate template, they're wrapped into a common
-		package only for the packaging reasons.
-		</para>
-
-		<para>
-		<pre>makeExitLabel()</pre> is quite simple, it creates a label with hardcoded
-		function of setting the variable <pre>$srv_exit</pre>. Even its row type
-		is hardcoded to the empty rows.
-		</para>
-
-		<para>
-		<pre>makeServerOutLabel()</pre> is more interesting. It prints the rows received from
-		another label into the socket in the simple CSV (as usual, no commas in the
-		values) format, the same as is expected by the socket server. It finds the
-		unit and row type from that parent label, creates the printing label
-		and chains it off the parent label. The newly created label is returned.
-		The return value can be kept in a variable or immediately discarded;
-		since the created label is already chained, it won't disappear.
-		Tha name of the new label is produced from the name of the parent
-		label by appending <quote>.serverOut</quote> to it.
 		</para>
 
 		<para>
 		Another similar template that is used throughout the following
-		chapters creates a label that prints the rowop contents:
+		chapters creates a label that prints the rowop contents.
+		It's located in the package that wraps the input (e.g. feeding)
+		and output of the tests:
 		</para>
 
-<!-- t/Collapse.t and other files -->
+<!-- lib/Triceps/X/TestFeed.pm -->
 <pre>
+package Triceps::X::TestFeed;
+
 # a template to make a label that prints the data passing through another label
 sub makePrintLabel($$) # ($print_label_name, $parent_label)
 {
@@ -331,8 +286,8 @@ sub makePrintLabel($$) # ($print_label_name, $parent_label)
 	my $lb = $lbParent->getUnit()->makeLabel($lbParent->getType(), $name,
 		undef, sub { # (label, rowop)
 			&send($_[1]->printP(), "\n");
-		}) or die "$!";
-	$lbParent->chain($lb) or die "$!";
+		});
+	$lbParent->chain($lb);
 	return $lb;
 }
 </pre>
@@ -426,25 +381,25 @@ sub getName # ($self)
 		infrastructure: the function to start the server in background and connect
 		a client to it, the creation of the row type and table type to
 		query, and then finally near the end the interesting part: the
-		usage of the query template.
+		usage of the query template. The general running is enclosed
+		in the package Triceps::X::DumbClient:
 		</para>
 
-<!-- t/xQuery.t, assembled from 3 parts -->
+<!-- lib/Triceps/X/DumbClient.pm -->
 <pre>
+package Triceps::X::DumbClient;
 
-# The common client that connects to the port, sends and receives data,
-# and waits for the server to exit.
 sub run # ($labels)
 {
 	my $labels = shift;
 
-	my ($port, $pid) = startServer($labels);
+	my ($port, $pid) = Triceps::X::SimpleServer::startServer(0, $labels);
 	my $sock = IO::Socket::INET->new(
 		Proto => "tcp",
 		PeerAddr => "localhost",
 		PeerPort => $port,
 	) or confess "socket failed: $!";
-	while(&readLine) {
+	while(& readLine) {
 		$sock->print($_);
 		$sock->flush();
 	}
@@ -452,41 +407,10 @@ sub run # ($labels)
 	$sock->flush();
 	$sock->shutdown(1); # SHUT_WR
 	while(<$sock>) {
-		&send($_);
+		& send($_);
 	}
 	waitpid($pid, 0);
 }
-
-# The basic table type to be used as template argument.
-our $rtTrade = Triceps::RowType->new(
-	id => "int32", # trade unique id
-	symbol => "string", # symbol traded
-	price => "float64",
-	size => "float64", # number of shares traded
-) or confess "$!";
-
-our $ttWindow = Triceps::TableType->new($rtTrade)
-	->addSubIndex("bySymbol", 
-		Triceps::SimpleOrderedIndex->new(symbol => "ASC")
-			->addSubIndex("last2",
-				Triceps::IndexType->newFifo(limit => 2)
-			)
-	)
-	or confess "$!";
-$ttWindow->initialize() or confess "$!";
-
-my $uTrades = Triceps::Unit->new("uTrades");
-my $tWindow = $uTrades->makeTable($ttWindow, "EM_CALL", "tWindow")
-	or confess "$!";
-my $query = Query1->new($tWindow, "qWindow");
-my $srvout = &ServerHelpers::makeServerOutLabel($query->getOutputLabel());
-
-my %dispatch;
-$dispatch{$tWindow->getName()} = $tWindow->getInputLabel();
-$dispatch{$query->getName()} = $query->getInputLabel();
-$dispatch{"exit"} = &ServerHelpers::makeExitLabel($uTrades, "exit");
-
-run(\%dispatch);
 </pre>
 
 		<para>
@@ -506,6 +430,43 @@ run(\%dispatch);
 		or send a small subscription request and print the data received
 		from the subscription.
 		</para>
+
+		<para>
+		Then the actual example makes use of this function:
+		</para>
+
+<!-- t/xQuery.t assembled from common and runQuery1 -->
+<pre>
+# The basic table type to be used as template argument.
+our $rtTrade = Triceps::RowType->new(
+	id => "int32", # trade unique id
+	symbol => "string", # symbol traded
+	price => "float64",
+	size => "float64", # number of shares traded
+);
+
+our $ttWindow = Triceps::TableType->new($rtTrade)
+	->addSubIndex("bySymbol", 
+		Triceps::SimpleOrderedIndex->new(symbol => "ASC")
+			->addSubIndex("last2",
+				Triceps::IndexType->newFifo(limit => 2)
+			)
+	)
+;
+$ttWindow->initialize();
+
+my $uTrades = Triceps::Unit->new("uTrades");
+my $tWindow = $uTrades->makeTable($ttWindow, "tWindow");
+my $query = Query1->new($tWindow, "qWindow");
+my $srvout = &Triceps::X::SimpleServer::makeServerOutLabel($query->getOutputLabel());
+
+my %dispatch;
+$dispatch{$tWindow->getName()} = $tWindow->getInputLabel();
+$dispatch{$query->getName()} = $query->getInputLabel();
+$dispatch{"exit"} = &Triceps::X::SimpleServer::makeExitLabel($uTrades, "exit");
+
+Triceps::X::DumbClient::run(\%dispatch);
+</pre>
 
 		<para>
 		The row type and table type have been just copied from some
@@ -600,6 +561,8 @@ $dispatch{"exit"} = &ServerHelpers::makeExitLabel($uTrades, "exit");
 package TableQuery2;
 use Carp;
 
+sub CLONE_SKIP { 1; }
+
 sub new # ($class, $unit, $tabType, $name)
 {
 	my $class = shift;
@@ -607,8 +570,7 @@ sub new # ($class, $unit, $tabType, $name)
 	my $tabType = shift;
 	my $name = shift;
 
-	my $table = $unit->makeTable($tabType, "EM_CALL", $name)
-		or confess "Query2 table creation failed: $!";
+	my $table = $unit->makeTable($tabType, $name);
 	my $rt = $table->getRowType();
 
 	my $self = {};
@@ -628,7 +590,7 @@ sub new # ($class, $unit, $tabType, $name)
 	}, $self);
 	$self->{resLabel} = $unit->makeDummyLabel($rt, $name . ".response");
 	
-	$self->{sendLabel} = &ServerHelpers::makeServerOutLabel($self->{resLabel});
+	$self->{sendLabel} = &Triceps::X::SimpleServer::makeServerOutLabel($self->{resLabel});
 
 	bless $self, $class;
 	return $self;
@@ -689,7 +651,6 @@ sub makeTableQuery2 # ($self, $tabType, $name)
 {
 	return TableQuery2->new(@_);
 }
-
 </pre>
 
 		<para>
@@ -922,9 +883,13 @@ my $query = Query3->new(table => $tWindow, name => "qWindow");
 package ServerOutput;
 use Carp;
 
+sub CLONE_SKIP { 1; }
+
 # Sending of rows to the server output.
 sub new # ($class, $option => $value, ...)
 {
+	no warnings;
+
 	my $class = shift;
 	my $self = {};
 
@@ -950,7 +915,7 @@ sub new # ($class, $option => $value, ...)
 
 	my $lb = $self->{unit}->makeLabel($self->{rowType}, 
 		$self->{name}, undef, sub {
-			&main::outCurBuf(join(",", 
+			&Triceps::X::SimpleServer::outCurBuf(join(",", 
 				$fromLabel? $fromLabel->getName() : $self->{name},
 				&Triceps::opcodeString($_[1]->getOpcode()),
 				$_[1]->getRow()->toArray()) . "\n");
@@ -958,7 +923,7 @@ sub new # ($class, $option => $value, ...)
 	);
 	$self->{inLabel} = $lb;
 	if (defined $fromLabel) {
-		$fromLabel->chain($lb) or confess "$!";
+		$fromLabel->chain($lb);
 	}
 
 	bless $self, $class;
@@ -1002,8 +967,7 @@ my $srvout = ServerOutput->new(
 	unit => $uTrades,
 	rowType => $tWindow->getRowType(),
 );
-$query->getOutputLabel()->chain($srvout->getInputLabel())
-	or confess "$!";
+$query->getOutputLabel()->chain($srvout->getInputLabel());
 </pre>
 
 		<para>
@@ -1024,9 +988,13 @@ $query->getOutputLabel()->chain($srvout->getInputLabel())
 package ServerOutput2;
 use Carp;
 
+sub CLONE_SKIP { 1; }
+
 # Sending of rows to the server output.
 sub new # ($class, $option => $value, ...)
 {
+	no warnings;
+
 	my $class = shift;
 	my $self = {};
 
@@ -1054,7 +1022,7 @@ sub new # ($class, $option => $value, ...)
 
 	my $lb = $self->{unit}->makeLabel($self->{rowType}, 
 		$self->{name}, undef, sub {
-			&main::outCurBuf(join(",", 
+			&Triceps::X::SimpleServer::outCurBuf(join(",", 
 				$fromLabel? $fromLabel->getName() : $self->{name},
 				&Triceps::opcodeString($_[1]->getOpcode()),
 				$_[1]->getRow()->toArray()) . "\n");
@@ -1062,11 +1030,17 @@ sub new # ($class, $option => $value, ...)
 	);
 	$self->{inLabel} = $lb;
 	if (defined $fromLabel) {
-		$fromLabel->chain($lb) or confess "$!";
+		$fromLabel->chain($lb);
 	}
 
 	bless $self, $class;
 	return $self;
+}
+
+sub getInputLabel() # ($self)
+{
+	my $self = shift;
+	return $self->{inLabel};
 }
 </pre>
 
@@ -1117,6 +1091,8 @@ my $srvout = ServerOutput2->new(
 <pre>
 package Query4;
 use Carp;
+
+sub CLONE_SKIP { 1; }
 
 sub new # ($class, $optionName => $optionValue ...)
 {
@@ -1183,7 +1159,6 @@ sub new # ($class, $optionName => $optionValue ...)
 	bless $self, $class;
 	return $self;
 }
-
 </pre>
 
 		<para>
@@ -1263,6 +1238,8 @@ qWindow.out,OP_NOP,,,,
 package Query5;
 use Carp;
 
+sub CLONE_SKIP { 1; }
+
 sub new # ($class, $optionName => $optionValue ...)
 {
 	my $class = shift;
@@ -1293,14 +1270,15 @@ sub new # ($class, $optionName => $optionValue ...)
 			sub # ($query, $data)
 			{
 				use strict;
-				my ($query, $data) = @_;';
+				my ($query, $data) = @_;
+				my $v;';
 		foreach my $f (@$fields) {
 			my $t = $rtdef{$f};
 			confess "$class::new: unknown field '$f', the row type is:\n"
 					. $rt->print() . " "
 				unless defined $t;
 			$gencmp .= '
-				my $v = $query->get("' . quotemeta($f) . '");
+				$v = $query->get("' . quotemeta($f) . '");
 				if ($v) {';
 			if (&Triceps::Fields::isStringType($t)) {
 				$gencmp .= '
@@ -1437,6 +1415,8 @@ qWindow.out,OP_NOP,,,,
 package Query6;
 use Carp;
 
+sub CLONE_SKIP { 1; }
+
 sub new # ($class, $optionName => $optionValue ...)
 {
 	my $class = shift;
@@ -1494,7 +1474,11 @@ sub genComparison # ($self, $query)
 			{
 				use strict;';
 
-	while (($f, $v) = each %qhash) {
+	# the sorting keeps the key order predictable for the tests;
+	# the can also be done with Hash::Util::hash_traversal_mask() 
+	# but would not be backwards-compatible
+	foreach $f (sort keys %qhash) {
+		$v = $qhash{$f};
 		next unless($v);
 		my $t = $rtdef{$f};
 
@@ -1518,7 +1502,7 @@ sub genComparison # ($self, $query)
 		if $@;
 
 	# for debugging
-	&main::outCurBuf("Compiled comparator:\n$gencmp\n");
+	&Triceps::X::SimpleServer::outCurBuf("Compiled comparator:\n$gencmp\n");
 
 	return $compare;
 }
@@ -1618,9 +1602,11 @@ qWindow.out,OP_NOP,,,,
 		field names and make the effects of the field renaming visible.
 		</para>
 
-<!-- t/xQuery.t, Query7 -->
+<!-- t/xQuery.t, Query7, assembled from 2 parts -->
 <pre>
 package Query7;
+
+sub CLONE_SKIP { 1; }
 
 sub new # ($class, $optionName => $optionValue ...)
 {
@@ -1694,24 +1680,23 @@ sub getName # ($self)
 package main;
 
 my $uTrades = Triceps::Unit->new("uTrades");
-my $tWindow = $uTrades->makeTable($ttWindow, "EM_CALL", "tWindow")
-	or confess "$!";
+my $tWindow = $uTrades->makeTable($ttWindow, "tWindow");
 my $query = Query7->new(table => $tWindow, name => "qWindow",
 	resultFields => [ '!id', 'size/lot_$&', '.*' ],
 );
 # print in the tokenized format
 my $srvout = $uTrades->makeLabel($query->getOutputLabel()->getType(), 
 	$query->getOutputLabel()->getName() . ".serverOut", undef, sub {
-		&main::outCurBuf($_[1]->printP() . "\n");
+		&Triceps::X::SimpleServer::outCurBuf($_[1]->printP() . "\n");
 	});
-$query->getOutputLabel()->chain($srvout) or confess "$!";
+$query->getOutputLabel()->chain($srvout);
 
 my %dispatch;
 $dispatch{$tWindow->getName()} = $tWindow->getInputLabel();
 $dispatch{$query->getName()} = $query->getInputLabel();
-$dispatch{"exit"} = &ServerHelpers::makeExitLabel($uTrades, "exit");
+$dispatch{"exit"} = &Triceps::X::SimpleServer::makeExitLabel($uTrades, "exit");
 
-run(\%dispatch);
+Triceps::X::DumbClient::run(\%dispatch);
 </pre>
 
 		<indexterm>
@@ -1938,6 +1923,7 @@ $row = &$projectFunc($origRow1, $origRow2, ..., $origRowN);
 <!-- lib/Triceps/Fields.pm -->
 <pre>
 package Triceps::Fields;
+
 use Carp;
 
 use strict;
@@ -1991,8 +1977,8 @@ sub makeTranslation # (optName => optValue, ...)
 			);
 		}';
 
-	my $result_rt = Triceps::RowType->new(@rowdef)
-		or confess "$myname: Invalid result row type specification: $! ";
+	my $result_rt = Triceps::RowType->new(@rowdef);
+		# XXX extended error "$myname: Invalid result row type specification: $! ";
 
 	${$opts->{saveCodeTo}} = $gencode if (defined($opts->{saveCodeTo}));
 

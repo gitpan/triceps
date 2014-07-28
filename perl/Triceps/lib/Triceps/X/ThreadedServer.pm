@@ -1,5 +1,5 @@
 #
-# (C) Copyright 2011-2013 Sergey A. Babkin.
+# (C) Copyright 2011-2014 Sergey A. Babkin.
 # This file is a part of Triceps.
 # See the file COPYRIGHT for the copyright notice and license information
 #
@@ -12,7 +12,7 @@ package Triceps::X::ThreadedServer;
 
 sub CLONE_SKIP { 1; }
 
-our $VERSION = 'v1.0.93';
+our $VERSION = 'v2.0.0';
 
 use Carp;
 use Errno qw(EINTR EAGAIN);
@@ -92,7 +92,7 @@ sub interceptSigPipe
 # socketName => $name
 # (optional) Name to use for passing the socket to the main thread.
 # Default: "$threadName.listen". The main thread gets the full responsibility
-# for the socket, so it should use trackGetSocket().
+# for the socket, so it should use trackGetFile().
 #
 # fork => 0/1/-1
 # (optional) Tells how to fork the server:
@@ -207,7 +207,7 @@ sub startServer # ($optName => $optValue, ...)
 #   main => main function (\&TrieadMainFunc)
 #   socketName => name of socket stored in the App (same as name of the thread, 
 #     formed from $prefix), the handler thread's responsibility is to make the
-#     app forget it, such as by using trackGetSocket().
+#     app forget it, such as by using trackGetFile().
 # The options "prefix" and "handler" are not passed through.
 #
 sub listen # ($optName => $optValue, ...)
@@ -235,7 +235,7 @@ sub listen # ($optName => $optValue, ...)
 	while(!$owner->isRqDead()) {
 		my $client = $sock->accept();
 		if (!defined $client) {
-			my $err = "$!"; # or th etext message will be reset by isRqDead()
+			my $err = "$!"; # or the text message will be reset by isRqDead()
 			if ($owner->isRqDead()) {
 				last;
 			} elsif($!{EAGAIN} || $!{EINTR}) { # numeric codes don't get reset

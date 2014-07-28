@@ -1,5 +1,5 @@
 //
-// (C) Copyright 2011-2013 Sergey A. Babkin.
+// (C) Copyright 2011-2014 Sergey A. Babkin.
 // This file is a part of Triceps.
 // See the file COPYRIGHT for the copyright notice and license information
 //
@@ -61,7 +61,7 @@ UTESTCASE fifoIndex(Utest *utest)
 	UT_ASSERT(tt->getErrors().isNull());
 	UT_ASSERT(!tt->getErrors()->hasError());
 
-	Autoref<Table> t = tt->makeTable(unit, Table::EM_IGNORE, "t");
+	Autoref<Table> t = tt->makeTable(unit, "t");
 	UT_ASSERT(!t.isNull());
 	UT_ASSERT(t->getInputLabel() != NULL);
 	UT_ASSERT(t->getLabel() != NULL);
@@ -204,7 +204,7 @@ UTESTCASE fifoIndexLimit(Utest *utest)
 	UT_ASSERT(tt->getErrors().isNull());
 	UT_ASSERT(!tt->getErrors()->hasError());
 
-	Autoref<Table> t = tt->makeTable(unit, Table::EM_CALL, "t");
+	Autoref<Table> t = tt->makeTable(unit, "t");
 	UT_ASSERT(!t.isNull());
 	UT_ASSERT(t->getInputLabel() != NULL);
 	UT_ASSERT(t->getLabel() != NULL);
@@ -307,7 +307,7 @@ UTESTCASE fifoIndexJumping(Utest *utest)
 	UT_ASSERT(tt->getErrors().isNull());
 	UT_ASSERT(!tt->getErrors()->hasError());
 
-	Autoref<Table> t = tt->makeTable(unit, Table::EM_CALL, "t");
+	Autoref<Table> t = tt->makeTable(unit, "t");
 	UT_ASSERT(!t.isNull());
 	UT_ASSERT(t->getInputLabel() != NULL);
 	UT_ASSERT(t->getLabel() != NULL);
@@ -415,7 +415,7 @@ UTESTCASE fifoIndexLimitReplace(Utest *utest)
 	UT_ASSERT(tt->getErrors().isNull());
 	UT_ASSERT(!tt->getErrors()->hasError());
 
-	Autoref<Table> t = tt->makeTable(unit, Table::EM_CALL, "t");
+	Autoref<Table> t = tt->makeTable(unit, "t");
 	UT_ASSERT(!t.isNull());
 	UT_ASSERT(t->getInputLabel() != NULL);
 	UT_ASSERT(t->getLabel() != NULL);
@@ -555,7 +555,7 @@ UTESTCASE fifoIndexLimitNoReplace(Utest *utest)
 	UT_ASSERT(tt->getErrors().isNull());
 	UT_ASSERT(!tt->getErrors()->hasError());
 
-	Autoref<Table> t = tt->makeTable(unit, Table::EM_CALL, "t");
+	Autoref<Table> t = tt->makeTable(unit, "t");
 	UT_ASSERT(!t.isNull());
 	UT_ASSERT(t->getInputLabel() != NULL);
 	UT_ASSERT(t->getLabel() != NULL);
@@ -667,7 +667,7 @@ UTESTCASE deepNested(Utest *utest)
 	UT_ASSERT(tt->getErrors().isNull());
 	UT_ASSERT(!tt->getErrors()->hasError());
 
-	Autoref<Table> t = tt->makeTable(unit, Table::EM_CALL, "t");
+	Autoref<Table> t = tt->makeTable(unit, "t");
 	UT_ASSERT(!t.isNull());
 
 	Autoref<IndexType> parallel1 = tt->findSubIndex("parallel1");

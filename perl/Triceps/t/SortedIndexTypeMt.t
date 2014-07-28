@@ -1,5 +1,5 @@
 #
-# (C) Copyright 2011-2013 Sergey A. Babkin.
+# (C) Copyright 2011-2014 Sergey A. Babkin.
 # This file is a part of Triceps.
 # See the file COPYRIGHT for the copyright notice and license information
 #
@@ -91,7 +91,7 @@ ok($res, "index PerlSortedIndex(withArgs)");
 				#->addSubIndex("primary", Triceps::IndexType->newHashed(key => [ "b", "c" ]))
 			;
 			ok(ref $tt1, "Triceps::TableType");
-			$tt1->initialize() or confess "$!";
+			$tt1->initialize();
 
 			my $faOut = $owner->makeNexus(
 				name => "source",
@@ -136,8 +136,8 @@ ok($res, "index PerlSortedIndex(withArgs)");
 					);
 
 					my $tt1 = $faSource->impTableType("tt1");
-					$tt1->initialize() or confess "$!";
-					my $t1 = $unit->makeTable($tt1, "EM_CALL", "t1") or confess "$!";
+					$tt1->initialize();
+					my $t1 = $unit->makeTable($tt1, "t1");
 
 					$faSource->getLabel("data")->chain($t1->getInputLabel());
 					$t1->getOutputLabel()->chain($faSink->getLabel("out"));
@@ -214,7 +214,7 @@ sink.dump OP_INSERT b="2" c="2"
 				#->addSubIndex("primary", Triceps::IndexType->newHashed(key => [ "b", "c" ]))
 			;
 			ok(ref $tt1, "Triceps::TableType");
-			$tt1->initialize() or confess "$!";
+			$tt1->initialize();
 
 			my $faOut = $owner->makeNexus(
 				name => "source",
@@ -259,8 +259,8 @@ sink.dump OP_INSERT b="2" c="2"
 					);
 
 					my $tt1 = $faSource->impTableType("tt1");
-					$tt1->initialize() or confess "$!";
-					my $t1 = $unit->makeTable($tt1, "EM_CALL", "t1") or confess "$!";
+					$tt1->initialize();
+					my $t1 = $unit->makeTable($tt1, "t1");
 
 					$faSource->getLabel("data")->chain($t1->getInputLabel());
 					$t1->getOutputLabel()->chain($faSink->getLabel("out"));
@@ -345,7 +345,7 @@ sink.dump OP_INSERT b="2" c="2"
 				);
 			;
 			ok(ref $tt1, "Triceps::TableType");
-			$tt1->initialize() or confess "$!";
+			$tt1->initialize();
 
 			eval {
 				my $faOut = $owner->makeNexus(
@@ -360,7 +360,7 @@ sink.dump OP_INSERT b="2" c="2"
 					import => "writer",
 				);
 			};
-			ok($@, qr/^Triceps::TrieadOwner::makeNexus: invalid arguments:\n  In app 'a1' thread 'main' can not export the facet 'source' with an error:\n    Can not export the table type 'tt1' containing errors:\n      index error:\n        nested index 1 'primary':\n          PerlSortedIndex\(basic\) compare function is not compatible with multithreading:\n            the code is not a source code string/);
+			ok($@, qr/^Triceps::TrieadOwner::makeNexus: invalid arguments:\n  In app 'a1' thread 'main' can not export the facet 'source' with an error:\n    Can not export the table type 'tt1' containing errors:\n      index error:\n        nested index 1 'primary':\n          PerlSortedIndex\(basic\) compare function is not compatible with multithreading:\n            Triceps::IndexType::newPerlSorted\(compare\): the code is not a source code string/);
 
 		},
 	);
@@ -391,7 +391,7 @@ sink.dump OP_INSERT b="2" c="2"
 				);
 			;
 			ok(ref $tt1, "Triceps::TableType");
-			$tt1->initialize() or confess "$!";
+			$tt1->initialize();
 
 			eval {
 				my $faOut = $owner->makeNexus(

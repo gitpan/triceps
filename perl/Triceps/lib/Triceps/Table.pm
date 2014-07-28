@@ -1,5 +1,5 @@
 #
-# (C) Copyright 2011-2013 Sergey A. Babkin.
+# (C) Copyright 2011-2014 Sergey A. Babkin.
 # This file is a part of Triceps.
 # See the file COPYRIGHT for the copyright notice and license information
 #
@@ -7,17 +7,15 @@
 
 package Triceps::Table;
 
-our $VERSION = 'v1.0.93';
-
-use Carp;
+our $VERSION = 'v2.0.0';
 
 # create a row with specified fields and find it, thus 
 # making more convenient to search by key fields
 sub findBy # (self, fieldName => fieldValue, ...)
 {
 	my $self = shift;
-	my $row = $self->getRowType()->makeRowHash(@_) or Carp::confess "$!";
-	my $res = $self->find($row) or Carp::confess "$!";
+	my $row = $self->getRowType()->makeRowHash(@_);
+	my $res = $self->find($row);
 	return $res;
 }
 
@@ -27,8 +25,8 @@ sub findIdxBy # (self, idxType, fieldName => fieldValue, ...)
 {
 	my $self = shift;
 	my $idx = shift;
-	my $row = $self->getRowType()->makeRowHash(@_) or Carp::confess "$!";
-	my $res = $self->findIdx($idx, $row) or Carp::confess "$!";
+	my $row = $self->getRowType()->makeRowHash(@_);
+	my $res = $self->findIdx($idx, $row);
 	return $res;
 }
 

@@ -1,5 +1,5 @@
 //
-// (C) Copyright 2011-2013 Sergey A. Babkin.
+// (C) Copyright 2011-2014 Sergey A. Babkin.
 // This file is a part of Triceps.
 // See the file COPYRIGHT for the copyright notice and license information
 //
@@ -44,12 +44,12 @@ void croakIfSet();
 void croakWithMsg(const char *msg)
 	__attribute__noreturn__;
 
-// Clear the perl $! variable and the Triceps::_CROAK_MSG.
-void clearErrMsg();
-
-// Set a message in Perl $! variable, and also set the croak message.
-// @param msg - error message
-void setErrMsg(const std::string &msg);
+// Clear the Triceps::_CROAK_MSG.
+// CURRENTLY IT DOES NOTHING BUT THE CONVENTION IS STILL TO CALL IT 
+// AT THE START OF EVERY XS FUNCTION, in case if the actual clearing
+// would ever need to be enabled again.
+inline void clearErrMsg()
+{ }
 
 // Copy a Perl scalar (numeric) SV value into a memory buffer.
 // @param ti - field type selection
@@ -63,12 +63,14 @@ bool svToBytes(Type::TypeId ti, SV *val, char *bytes);
 // Does NOT check for undef, the caller must do that before.
 // Also silently allows to set the arrays for the scalar fields
 // and scalars into arrays.
+//
+// Checks for other conversion errors and throws an Exception.
 // 
 // @param ti - field type selection
 // @param arg - value to post to, must be already checked for SvOK
 // @param fname - field name, for error messages
-// @return - new buffer (with size_ set), or NULL (then with error set)
-EasyBuffer * valToBuf(Type::TypeId ti, SV *arg, const char *fname);
+// @return - new buffer (with size_ set)
+EasyBuffer *valToBuf(Type::TypeId ti, SV *arg, const char *fname);
 
 // Convert a byte buffer from a row to a Perl value.
 // @param ti - id of the simple type
@@ -84,39 +86,37 @@ EasyBuffer * valToBuf(Type::TypeId ti, SV *arg, const char *fname);
 SV *bytesToVal(Type::TypeId ti, int arsz, bool notNull, const char *data, intptr_t dlen, const char *fname);
 
 // Parse an option value of reference to array into a NameSet
-// On error calls setErrMsg and returns NULL.
+// On error throws an Exception.
 // @param funcName - calling function name, for error messages
 // @param optname - option name of the originating value, for error messages
 // @param ref - option value (will be checked for being a reference to array)
-// @return - the parsed NameSet or NULL on error
+// @return - the parsed NameSet
 Onceref<NameSet> parseNameSet(const char *funcName, const char *optname, SV *optval);
 
 // Parse an enqueuing mode as an integer or string constant to an enum.
-// On error calls setErrMsg and returns false.
+// On error throws an Exception.
 // @param funcName - calling function name, for error messages
 // @param enqMode - SV containing the value to parse
-// @param em - place to return the parsed value
-// @return - true on success or false on error
-bool parseEnqMode(const char *funcName, SV *enqMode, Gadget::EnqMode &em);
+// @return - the parsed value
+Gadget::EnqMode parseEnqMode(const char *funcName, SV *enqMode);
 
 // Parse an opcode as an integer or string constant to an enum.
-// On error calls setErrMsg and returns false.
+// On error throws an Exception.
 // @param funcName - calling function name, for error messages
 // @param opcode - SV containing the value to parse
-// @param op - place to return the parsed value
-// @return - true on success or false on error
-bool parseOpcode(const char *funcName, SV *opcode, Rowop::Opcode &op);
+// @return - the parsed value
+Rowop::Opcode parseOpcode(const char *funcName, SV *opcode);
 
 // Parse an IndexId as an integer or string constant to an enum.
-// On error calls setErrMsg and returns false.
+// On error throws an Exception.
 // @param funcName - calling function name, for error messages
 // @param idarg - SV containing the value to parse
-// @param id - place to return the parsed value
-// @return - true on success or false on error
-bool parseIndexId(const char *funcName, SV *idarg, IndexType::IndexId &id);
+// @return - the parsed value
+IndexType::IndexId parseIndexId(const char *funcName, SV *idarg);
 
 // Enqueue one argument in a unit. The argument may be either a Rowop or a Tray,
-// detected automatically. Checks for errors and populates the error messages.
+// detected automatically.
+// On error throws an Exception.
 // @param funcName - calling function name, for error messages
 // @param u - unit where to enqueue
 // @param mark - loop mark, if not NULL then used to fork at this frame and em 
@@ -124,8 +124,7 @@ bool parseIndexId(const char *funcName, SV *idarg, IndexType::IndexId &id);
 // @param em - enqueuing mode (used if mark is not NULL)
 // @param arg - argument (should be Rowop or Tray reference)
 // @param i - argument number, for error messages
-// @return - true on success, false on error
-bool enqueueSv(char *funcName, Unit *u, FrameMark *mark, Gadget::EnqMode em, SV *arg, int i);
+void enqueueSv(char *funcName, Unit *u, FrameMark *mark, Gadget::EnqMode em, SV *arg, int i);
 
 // The Unit::Tracer subclasses hierarchy is partially exposed to Perl. So an Unit::Tracer
 // object can not be returned to Perl by a simple wrapping and blessing to a fixed class.
@@ -139,39 +138,40 @@ char *translateUnitTracerSubclass(const Unit::Tracer *tr);
 // See RowType.xs for an example of usage
 #define GEN_PRINT_METHOD(subtype)  \
 		static char funcName[] =  "Triceps::" #subtype "::print"; \
-		clearErrMsg(); \
-		subtype *rt = self->get(); \
-		\
-		if (items > 3) { \
-			setErrMsg( strprintf("Usage: %s(self [, indent  [, subindent ] ])", funcName)); \
-			XSRETURN_UNDEF; \
-		} \
-		\
-		string indent, subindent; \
-		const string *indarg = &indent; \
-		\
-		if (items > 1) { /* parse indent */ \
-			if (SvOK(ST(1))) { \
+		try { \
+			clearErrMsg(); \
+			subtype *rt = self->get(); \
+			\
+			if (items > 3) { \
+				throw Exception::f("Usage: %s(self [, indent  [, subindent ] ])", funcName); \
+			} \
+			\
+			string indent, subindent; \
+			const string *indarg = &indent; \
+			\
+			if (items > 1) { /* parse indent */ \
+				if (SvOK(ST(1))) { \
+					const char *p; \
+					STRLEN len; \
+					p = SvPV(ST(1), len); \
+					indent.assign(p, len); \
+				} else { \
+					indarg = &NOINDENT; \
+				} \
+			} \
+			if (items > 2) { /* parse subindent */ \
 				const char *p; \
 				STRLEN len; \
-				p = SvPV(ST(1), len); \
-				indent.assign(p, len); \
+				p = SvPV(ST(2), len); \
+				subindent.assign(p, len); \
 			} else { \
-				indarg = &NOINDENT; \
+				subindent.assign("  "); \
 			} \
-		} \
-		if (items > 2) { /* parse subindent */ \
-			const char *p; \
-			STRLEN len; \
-			p = SvPV(ST(2), len); \
-			subindent.assign(p, len); \
-		} else { \
-			subindent.assign("  "); \
-		} \
-		\
-		string res; \
-		rt->printTo(res, *indarg, subindent); \
-		XPUSHs(sv_2mortal(newSVpvn(res.c_str(), res.size())));
+			\
+			string res; \
+			rt->printTo(res, *indarg, subindent); \
+			XPUSHs(sv_2mortal(newSVpvn(res.c_str(), res.size()))); \
+		} TRICEPS_CATCH_CROAK;
 
 // A common macro to catch the Triceps::Exception and convert it to a croak.
 // Use:
@@ -184,8 +184,8 @@ char *translateUnitTracerSubclass(const Unit::Tracer *tr);
 #define TRICEPS_CATCH_CROAK \
 	catch (Exception e) { \
 		setCroakMsg(e.getErrors()->print()); \
-	} \
-	croakIfSet()
+		croakIfSet(); \
+	}
 
 // object parsing and conversion {
 

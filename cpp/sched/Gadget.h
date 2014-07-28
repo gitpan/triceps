@@ -1,5 +1,5 @@
 //
-// (C) Copyright 2011-2013 Sergey A. Babkin.
+// (C) Copyright 2011-2014 Sergey A. Babkin.
 // This file is a part of Triceps.
 // See the file COPYRIGHT for the copyright notice and license information
 //
@@ -75,7 +75,7 @@ protected:
 	// @param mode - how the rowops will be enqueued
 	// @parem name - name of the gadget if known, will be used to name the label
 	// @param rt - row type produced by this gadget, or NULL if not known yet
-	Gadget(Unit *unit, EnqMode mode, const string &name = "", const_Onceref<RowType> rt = (const RowType*)NULL);
+	Gadget(Unit *unit, EnqMode mode, const string &name, const_Onceref<RowType> rt = (const RowType*)NULL);
 
 	// Change the enqueueing mode.
 	void setEnqMode(EnqMode mode)

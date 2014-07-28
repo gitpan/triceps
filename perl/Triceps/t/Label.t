@@ -1,5 +1,5 @@
 #
-# (C) Copyright 2011-2013 Sergey A. Babkin.
+# (C) Copyright 2011-2014 Sergey A. Babkin.
 # This file is a part of Triceps.
 # See the file COPYRIGHT for the copyright notice and license information
 #
@@ -15,7 +15,7 @@
 use ExtUtils::testlib;
 
 use Test;
-BEGIN { plan tests => 62 };
+BEGIN { plan tests => 64 };
 use Triceps;
 ok(1); # If we made it this far, we're ok.
 
@@ -53,9 +53,8 @@ ok(ref $tt1, "Triceps::TableType");
 
 $res = $tt1->initialize();
 ok($res, 1);
-#print STDERR "$!" . "\n";
 
-$t1 = $u1->makeTable($tt1, "EM_SCHEDULE", "tab1");
+$t1 = $u1->makeTable($tt1, "tab1");
 ok(ref $t1, "Triceps::Table");
 
 $lb = $t1->getOutputLabel();
@@ -260,7 +259,7 @@ package main;
 	ok(!defined eval {
 		$olb->makeChained("lbChained", 1, 2);
 	});
-	ok($@, qr/^Triceps::Unit::makeLabel\(clear\): code must be a reference to Perl function/);
+	ok($@, qr/^Triceps::Unit::makeLabel\(clear\): code must be a source code string or a reference to Perl function/);
 	ok(!defined eval {
 		$olb->makeChained("lbChained", undef);
 	});
@@ -269,6 +268,22 @@ package main;
 		$olb->clear();
 		$olb->makeChained("lbChained", undef, undef);
 	});
-	ok($@, qr/^Triceps::Label::getUnit: label has been already cleared at \S+ line \d+\n\tTriceps::Label::makeChained/);
+	ok($@, qr/^Triceps::Label::getUnit: label has been already cleared at \S+ line \S+\n\tTriceps::Label::makeChained/);
+}
+
+######################### code snippets #################################
+
+# this gets transparently supported in the callback logic, so just
+# test that the label can be constructed with the code snippets,
+# as a touch-test
+{
+	my $olb = $u1->makeDummyLabel($rt1, "lbOrig");
+	ok(ref $olb, "Triceps::Label");
+	my $clb = $olb->makeChained("lbChained", '
+		return 1
+	' , '
+		return 1
+	', 1, 2, 3);
+	ok(ref $clb, "Triceps::Label");
 }
 

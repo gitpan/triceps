@@ -1,5 +1,5 @@
 //
-// (C) Copyright 2011-2013 Sergey A. Babkin.
+// (C) Copyright 2011-2014 Sergey A. Babkin.
 // This file is a part of Triceps.
 // See the file COPYRIGHT for the copyright notice and license information
 //
@@ -12,6 +12,7 @@
 #include "ppport.h"
 
 #include "TricepsPerl.h"
+#include <app/Sigusr2.h>
 
 #include "const-c.inc"
 
@@ -193,14 +194,28 @@ isNop(int op)
 ############ conversions of strings to enum constants #############################
 #// (this duplicates the Triceps:: constant definitions but comes useful once in a while
 #// the error values are converted to undefs
+#// The *Safe functions return an undef if can not convert, normal ones croak.
 
 int
 stringOpcode(char *val)
 	CODE:
 		clearErrMsg();
 		int res = Rowop::stringOpcode(val);
+		try { do {
+			if (res == Rowop::OP_BAD)
+				throw Exception::f("Triceps::stringOpcode: bad opcode string '%s'", val);
+		} while(0); } TRICEPS_CATCH_CROAK;
+		RETVAL = res;
+	OUTPUT:
+		RETVAL
+
+int
+stringOpcodeSafe(char *val)
+	CODE:
+		clearErrMsg();
+		int res = Rowop::stringOpcode(val);
 		if (res == Rowop::OP_BAD)
-			XSRETURN_UNDEF;
+			XSRETURN_UNDEF; // not a croak
 		RETVAL = res;
 	OUTPUT:
 		RETVAL
@@ -210,8 +225,21 @@ stringOcf(char *val)
 	CODE:
 		clearErrMsg();
 		int res = Rowop::stringOcf(val);
+		try { do {
+			if (res == -1)
+				throw Exception::f("Triceps::stringOcf: bad opcode flag string '%s'", val);
+		} while(0); } TRICEPS_CATCH_CROAK;
+		RETVAL = res;
+	OUTPUT:
+		RETVAL
+
+int
+stringOcfSafe(char *val)
+	CODE:
+		clearErrMsg();
+		int res = Rowop::stringOcf(val);
 		if (res == -1)
-			XSRETURN_UNDEF;
+			XSRETURN_UNDEF; // not a croak
 		RETVAL = res;
 	OUTPUT:
 		RETVAL
@@ -221,8 +249,21 @@ stringEm(char *val)
 	CODE:
 		clearErrMsg();
 		int res = Gadget::stringEm(val);
+		try { do {
+			if (res == -1)
+				throw Exception::f("Triceps::stringEm: bad enqueueing mode string '%s'", val);
+		} while(0); } TRICEPS_CATCH_CROAK;
+		RETVAL = res;
+	OUTPUT:
+		RETVAL
+
+int
+stringEmSafe(char *val)
+	CODE:
+		clearErrMsg();
+		int res = Gadget::stringEm(val);
 		if (res == -1)
-			XSRETURN_UNDEF;
+			XSRETURN_UNDEF; // not a croak
 		RETVAL = res;
 	OUTPUT:
 		RETVAL
@@ -232,8 +273,21 @@ stringTracerWhen(char *val)
 	CODE:
 		clearErrMsg();
 		int res = Unit::stringTracerWhen(val);
+		try { do {
+			if (res == -1)
+				throw Exception::f("Triceps::stringTracerWhen: bad TracerWhen string '%s'", val);
+		} while(0); } TRICEPS_CATCH_CROAK;
+		RETVAL = res;
+	OUTPUT:
+		RETVAL
+
+int
+stringTracerWhenSafe(char *val)
+	CODE:
+		clearErrMsg();
+		int res = Unit::stringTracerWhen(val);
 		if (res == -1)
-			XSRETURN_UNDEF;
+			XSRETURN_UNDEF; // not a croak
 		RETVAL = res;
 	OUTPUT:
 		RETVAL
@@ -243,8 +297,21 @@ humanStringTracerWhen(char *val)
 	CODE:
 		clearErrMsg();
 		int res = Unit::humanStringTracerWhen(val);
+		try { do {
+			if (res == -1)
+				throw Exception::f("Triceps::humanStringTracerWhen: bad human-readable TracerWhen string '%s'", val);
+		} while(0); } TRICEPS_CATCH_CROAK;
+		RETVAL = res;
+	OUTPUT:
+		RETVAL
+
+int
+humanStringTracerWhenSafe(char *val)
+	CODE:
+		clearErrMsg();
+		int res = Unit::humanStringTracerWhen(val);
 		if (res == -1)
-			XSRETURN_UNDEF;
+			XSRETURN_UNDEF; // not a croak
 		RETVAL = res;
 	OUTPUT:
 		RETVAL
@@ -254,8 +321,21 @@ stringIndexId(char *val)
 	CODE:
 		clearErrMsg();
 		int res = IndexType::stringIndexId(val);
+		try { do {
+			if (res == -1)
+				throw Exception::f("Triceps::stringIndexId: bad index id string '%s'", val);
+		} while(0); } TRICEPS_CATCH_CROAK;
+		RETVAL = res;
+	OUTPUT:
+		RETVAL
+
+int
+stringIndexIdSafe(char *val)
+	CODE:
+		clearErrMsg();
+		int res = IndexType::stringIndexId(val);
 		if (res == -1)
-			XSRETURN_UNDEF;
+			XSRETURN_UNDEF; // not a croak
 		RETVAL = res;
 	OUTPUT:
 		RETVAL
@@ -265,8 +345,21 @@ stringAggOp(char *val)
 	CODE:
 		clearErrMsg();
 		int res = Aggregator::stringAggOp(val);
+		try { do {
+			if (res == -1)
+				throw Exception::f("Triceps::stringAggOp: bad aggregation opcode string '%s'", val);
+		} while(0); } TRICEPS_CATCH_CROAK;
+		RETVAL = res;
+	OUTPUT:
+		RETVAL
+
+int
+stringAggOpSafe(char *val)
+	CODE:
+		clearErrMsg();
+		int res = Aggregator::stringAggOp(val);
 		if (res == -1)
-			XSRETURN_UNDEF;
+			XSRETURN_UNDEF; // not a croak
 		RETVAL = res;
 	OUTPUT:
 		RETVAL
@@ -283,13 +376,36 @@ opcodeString(int val)
 	OUTPUT:
 		RETVAL
 
+#// exactly the same as opcodeString, just for the consistent naming
+char *
+opcodeStringSafe(int val)
+	CODE:
+		clearErrMsg();
+		const char *res = Rowop::opcodeString(val); // never returns NULL
+		RETVAL = (char *)res;
+	OUTPUT:
+		RETVAL
+
 char *
 ocfString(int val)
 	CODE:
 		clearErrMsg();
 		const char *res = Rowop::ocfString(val, NULL);
+		try { do {
+			if (res == NULL)
+				throw Exception::f("Triceps::ocfString: opcode flag value '%d' not defined in the enum", val);
+		} while(0); } TRICEPS_CATCH_CROAK;
+		RETVAL = (char *)res;
+	OUTPUT:
+		RETVAL
+
+char *
+ocfStringSafe(int val)
+	CODE:
+		clearErrMsg();
+		const char *res = Rowop::ocfString(val, NULL);
 		if (res == NULL)
-			XSRETURN_UNDEF;
+			XSRETURN_UNDEF; // not a croak
 		RETVAL = (char *)res;
 	OUTPUT:
 		RETVAL
@@ -299,8 +415,21 @@ emString(int val)
 	CODE:
 		clearErrMsg();
 		const char *res = Gadget::emString(val, NULL);
+		try { do {
+			if (res == NULL)
+				throw Exception::f("Triceps::emString: enqueueing mode value '%d' not defined in the enum", val);
+		} while(0); } TRICEPS_CATCH_CROAK;
+		RETVAL = (char *)res;
+	OUTPUT:
+		RETVAL
+
+char *
+emStringSafe(int val)
+	CODE:
+		clearErrMsg();
+		const char *res = Gadget::emString(val, NULL);
 		if (res == NULL)
-			XSRETURN_UNDEF;
+			XSRETURN_UNDEF; // not a croak
 		RETVAL = (char *)res;
 	OUTPUT:
 		RETVAL
@@ -310,8 +439,21 @@ tracerWhenString(int val)
 	CODE:
 		clearErrMsg();
 		const char *res = Unit::tracerWhenString(val, NULL);
+		try { do {
+			if (res == NULL)
+				throw Exception::f("Triceps::tracerWhenString: TracerWhen value '%d' not defined in the enum", val);
+		} while(0); } TRICEPS_CATCH_CROAK;
+		RETVAL = (char *)res;
+	OUTPUT:
+		RETVAL
+
+char *
+tracerWhenStringSafe(int val)
+	CODE:
+		clearErrMsg();
+		const char *res = Unit::tracerWhenString(val, NULL);
 		if (res == NULL)
-			XSRETURN_UNDEF;
+			XSRETURN_UNDEF; // not a croak
 		RETVAL = (char *)res;
 	OUTPUT:
 		RETVAL
@@ -321,8 +463,21 @@ tracerWhenHumanString(int val)
 	CODE:
 		clearErrMsg();
 		const char *res = Unit::tracerWhenHumanString(val, NULL);
+		try { do {
+			if (res == NULL)
+				throw Exception::f("Triceps::tracerWhenHumanString: TracerWhen value '%d' not defined in the enum", val);
+		} while(0); } TRICEPS_CATCH_CROAK;
+		RETVAL = (char *)res;
+	OUTPUT:
+		RETVAL
+
+char *
+tracerWhenHumanStringSafe(int val)
+	CODE:
+		clearErrMsg();
+		const char *res = Unit::tracerWhenHumanString(val, NULL);
 		if (res == NULL)
-			XSRETURN_UNDEF;
+			XSRETURN_UNDEF; // not a croak
 		RETVAL = (char *)res;
 	OUTPUT:
 		RETVAL
@@ -332,8 +487,21 @@ indexIdString(int val)
 	CODE:
 		clearErrMsg();
 		const char *res = IndexType::indexIdString(val, NULL);
+		try { do {
+			if (res == NULL)
+				throw Exception::f("Triceps::indexIdString: index id value '%d' not defined in the enum", val);
+		} while(0); } TRICEPS_CATCH_CROAK;
+		RETVAL = (char *)res;
+	OUTPUT:
+		RETVAL
+
+char *
+indexIdStringSafe(int val)
+	CODE:
+		clearErrMsg();
+		const char *res = IndexType::indexIdString(val, NULL);
 		if (res == NULL)
-			XSRETURN_UNDEF;
+			XSRETURN_UNDEF; // not a croak
 		RETVAL = (char *)res;
 	OUTPUT:
 		RETVAL
@@ -343,8 +511,21 @@ aggOpString(int val)
 	CODE:
 		clearErrMsg();
 		const char *res = Aggregator::aggOpString(val, NULL);
+		try { do {
+			if (res == NULL)
+				throw Exception::f("Triceps::aggOpString: aggregation opcode value '%d' not defined in the enum", val);
+		} while(0); } TRICEPS_CATCH_CROAK;
+		RETVAL = (char *)res;
+	OUTPUT:
+		RETVAL
+
+char *
+aggOpStringSafe(int val)
+	CODE:
+		clearErrMsg();
+		const char *res = Aggregator::aggOpString(val, NULL);
 		if (res == NULL)
-			XSRETURN_UNDEF;
+			XSRETURN_UNDEF; // not a croak
 		RETVAL = (char *)res;
 	OUTPUT:
 		RETVAL
@@ -378,4 +559,14 @@ now()
 		RETVAL = (double)tm.tv_sec + (double)tm.tv_nsec / 1000000000.;
 	OUTPUT:
 		RETVAL
+
+############ sigusr2 handling ####################################################
+
+#// Set up the dummy handler on SIGUSR2, overriding Perl's.
+#// Otherwise the recent versions of Perl (like 5.19) crash when
+#// they receive a signal at an inopportune time.
+void
+sigusr2_setup()
+	CODE:
+		Sigusr2::setup();
 

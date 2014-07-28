@@ -1,5 +1,5 @@
 #
-# (C) Copyright 2011-2013 Sergey A. Babkin.
+# (C) Copyright 2011-2014 Sergey A. Babkin.
 # This file is a part of Triceps.
 # See the file COPYRIGHT for the copyright notice and license information
 #
@@ -7,7 +7,7 @@
 
 package Triceps::TrieadOwner;
 
-our $VERSION = 'v1.0.93';
+our $VERSION = 'v2.0.0';
 
 use Carp;
 
@@ -41,7 +41,7 @@ sub close(*) # ($self, $file)
 	close($_[1]);
 }
 
-# Load an file from the App, track it, and return a TrackedFile
+# Track a file, and return a TrackedFile
 # that will automatically make this TrieadOwner forget the file
 # descriptor and then close and dereference the handle when the
 # TrackedFile is destroyed.
@@ -85,7 +85,7 @@ sub trackDupClass # ($self, $name, $mode, $class)
 {
 	my ($self, $name, $mode, $class) = @_;
 
-	my $fd = $self->app()->loadDupFd($name);
+	my ($fd, $fdclass) = $self->app()->loadDupFd($name);
 	# XXX this could leak the $fd if new_from_fd() fails
 	my $file = $class->new_from_fd($fd, $mode);
 	return ($self->makeTrackedFileFd($file, $fd), $file);
@@ -102,7 +102,7 @@ sub trackGetClass # ($self, $name, $mode, $class)
 	return ($tfd, $file);
 }
 
-# Load an IO::Handle from the App, track it, and return a TrackedFile
+# Load a file and its class name from the App, track it, and return a TrackedFile
 # that will automatically make this TrieadOwner forget the file
 # descriptor and then close and dereference the handle when the
 # TrackedFile is destroyed.
@@ -118,46 +118,22 @@ sub trackGetClass # ($self, $name, $mode, $class)
 # @return - a pair of (TrackedFile object, file handle)
 sub trackDupFile # ($self, $name, $mode)
 {
-	return trackDupClass(@_, "IO::Handle");
+	my ($self, $name, $mode) = @_;
+
+	my ($fd, $class) = $self->app()->loadDupFd($name);
+	$class = "IO::Handle" unless $class; # default is a plain file, since ref(*FILE) returns an empty string
+	# XXX this could leak the $fd if new_from_fd() fails
+	my $file = $class->new_from_fd($fd, $mode);
+	return ($self->makeTrackedFileFd($file, $fd), $file);
 }
 
 # Same as trackDupFile(), but also closes the original
 # file descriptor in the App, thus completely moving the
 # descriptor here.
-sub trackGetFile # ($self, $name, $mode, $class)
+sub trackGetFile # ($self, $name, $mode)
 {
 	my ($self, $name, $mode) = @_;
 	my ($tfd, $file) = trackDupFile(@_);
-	$self->app()->closeFd($name);
-	return ($tfd, $file);
-}
-
-# Load an IO::Socket::INET from the App, track it, and return a TrackedFile
-# that will automatically make this TrieadOwner forget the file
-# descriptor and then close and dereference the handle when the
-# TrackedFile is destroyed.
-#
-# Keep the file handle in a variable (not just the tracking 
-# object) if you're to start more threads, or Perl will leak the 
-# variables.
-#
-# @param self - the TrieadOwner object
-# @param name - the storage name of the file descriptor
-# @param mode - the file opening mode (either in r/w/a/r+/w+/a+
-#        or </>/>>/+</+>/+>> format)
-# @return - a pair of (TrackedFile object, file handle)
-sub trackDupSocket # ($self, $name, $mode)
-{
-	return trackDupClass(@_, "IO::Socket::INET");
-}
-
-# Same as trackDupSocket(), but also closes the original
-# file descriptor in the App, thus completely moving the
-# descriptor here.
-sub trackGetSocket # ($self, $name, $mode, $class)
-{
-	my ($self, $name, $mode) = @_;
-	my ($tfd, $file) = trackDupSocket(@_);
 	$self->app()->closeFd($name);
 	return ($tfd, $file);
 }

@@ -1,5 +1,5 @@
 #
-# (C) Copyright 2011-2013 Sergey A. Babkin.
+# (C) Copyright 2011-2014 Sergey A. Babkin.
 # This file is a part of Triceps.
 # See the file COPYRIGHT for the copyright notice and license information
 #
@@ -64,51 +64,51 @@ ok(join(",", @xfld3), "uint8[],int32[],int64[],float64[],string");
 @xfld3 = $rt3->getFieldMapping();
 ok(join(",", @xfld3), "a,0,b,1,c,2,d,3,e,4");
 
-$rt2 = Triceps::RowType->new(
+$rt2 = eval { Triceps::RowType->new(
 	a => "void",
 	b => "int32",
 	c => "int64",
 	d => "float64",
 	e => "string[]",
-);
+); };
 ok(!defined $rt2);
-ok($! . "", "Triceps::RowType::new: field 'e' string array type is not supported");
+ok($@, qr/^Triceps::RowType::new: field 'e' string array type is not supported at/);
 
-$rt2 = Triceps::RowType->new(
+$rt2 = eval { Triceps::RowType->new(
 	a => "void",
 	b => "int32",
 	c => "int64",
 	d => "float64",
 	e => "string",
-);
+); };
 ok(!defined $rt2);
-ok($! . "", "Triceps::RowType::new: field 'a' type must not be void");
+ok($@, qr/^Triceps::RowType::new: incorrect data\n  field 'a' type must not be void at/);
 
-$rt2 = Triceps::RowType->new(
+$rt2 = eval { Triceps::RowType->new(
 	a => "",
 	b => "int32",
 	c => "int64",
 	d => "float64",
 	e => "string",
-);
+); };
 ok(!defined $rt2);
-ok($! . "", "Triceps::RowType::new: field 'a' has an unknown type ''");
+ok($@, qr/^Triceps::RowType::new: field 'a' has an unknown type '' at/);
 
-$rt2 = Triceps::RowType->new(
-);
+$rt2 = eval { Triceps::RowType->new(
+); };
 ok(!defined $rt2);
-ok($! . "", "Usage: Triceps::RowType::new(CLASS, fieldName, fieldType, ...), names and types must go in pairs");
+ok($@, qr/^Usage: Triceps::RowType::new\(CLASS, fieldName, fieldType, ...\), names and types must go in pairs at/);
 
-undef $!;
-$rt2 = Triceps::RowType->new(
+undef $@;
+$rt2 = eval { Triceps::RowType->new(
 	a => "",
 	b => "int32",
 	c => "int64",
 	d => "float64",
 	"string",
-);
+); };
 ok(!defined $rt2);
-ok($! . "", "Usage: Triceps::RowType::new(CLASS, fieldName, fieldType, ...), names and types must go in pairs");
+ok($@, qr/^Usage: Triceps::RowType::new\(CLASS, fieldName, fieldType, ...\), names and types must go in pairs at/);
 
 # schema inheritance
 $rt2 = Triceps::RowType->new(
@@ -158,9 +158,9 @@ ok($v, "row { uint8 a, int32 b, int64 c, float64 d, string e, }");
 $v = $rt1->print(undef, "    ");
 ok($v, "row { uint8 a, int32 b, int64 c, float64 d, string e, }");
 
-$v = $rt1->print(undef, "    ", "zzzz");
+$v = eval { $rt1->print(undef, "    ", "zzzz"); };
 ok(!defined $v);
-ok ($! . "", "Usage: Triceps::RowType::print(self [, indent  [, subindent ] ])");
+ok ($@, qr/^Usage: Triceps::RowType::print\(self \[, indent  \[, subindent \] \]\) at/);
 
 $v = $rt3->print();
 ok($v, "row {\n  uint8[] a,\n  int32[] b,\n  int64[] c,\n  float64[] d,\n  string e,\n}");

@@ -1,5 +1,5 @@
 #
-# (C) Copyright 2011-2013 Sergey A. Babkin.
+# (C) Copyright 2011-2014 Sergey A. Babkin.
 # This file is a part of Triceps.
 # See the file COPYRIGHT for the copyright notice and license information
 #
@@ -10,6 +10,7 @@ use warnings;
 
 # This function must be outside the package.
 sub _Triceps_eval_ {
+	no warnings 'all'; # shut up the warnings from eval
 	# print "DBG code:\n$_[0]\n";
 	my $c = eval $_[0];
 	# print "DBG compiled $c\n";
@@ -50,7 +51,7 @@ our @EXPORT = qw(
 	
 );
 
-our $VERSION = 'v1.0.93';
+our $VERSION = 'v2.0.0';
 
 sub AUTOLOAD {
     # This AUTOLOAD is used to 'autoload' constants from the constant()
@@ -121,6 +122,10 @@ sub joinTid {
 require XSLoader;
 XSLoader::load('Triceps', $VERSION);
 
+# Set up a dummy handler in C, or the more recent Perl versions (like 5.19)
+# crash when they receive a signal at an inopportune time.
+Triceps::sigusr2_setup();
+
 # Preloaded methods go here.
 
 # Subpackages go here
@@ -143,6 +148,8 @@ require Triceps::JoinTwo;
 require Triceps::Triead;
 require Triceps::TrieadOwner;
 require Triceps::App;
+require Triceps::Braced;
+require Triceps::Code;
 # The X subpackages contain the eXperimental, eXample, eXtraneous code.
 require Triceps::X::SimpleServer;
 require Triceps::X::DumbClient;

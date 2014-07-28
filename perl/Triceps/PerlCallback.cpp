@@ -1,5 +1,5 @@
 //
-// (C) Copyright 2011-2013 Sergey A. Babkin.
+// (C) Copyright 2011-2014 Sergey A. Babkin.
 // This file is a part of Triceps.
 // See the file COPYRIGHT for the copyright notice and license information
 //
@@ -74,49 +74,61 @@ void PerlCallback::clear()
 	errt_ = NULL;
 }
 
-bool PerlCallback::setCode(SV *code, const char *fname)
+void PerlCallback::setCode(SV *code, const char *fname)
+{
+	setCodeFmt(code, "%s", fname);
+}
+
+void PerlCallback::setCodeFmt(SV *code, const char *fmt, ...)
+{
+	va_list ap;
+	va_start(ap, fmt);
+	try {
+		setCodeVa(code, fmt, ap);
+	} catch(Exception) {
+		va_end(ap);
+		throw;
+	}
+	va_end(ap);
+}
+
+void PerlCallback::setCodeVa(SV *code, const char *fmt, va_list ap)
 {
 	clear();
 
 	if (code == NULL) {
-		setErrMsg( string(fname) + ": code must not be NULL" );
-		return false;
+		string smsg = vstrprintf(fmt, ap);
+		throw Exception::f("%s: code must not be NULL", smsg.c_str());
 	}
 
-	if (threadable_) {
-		// printf("DBG %s: threadable\n", fname);
-		if (SvPOK(code)) {
-			STRLEN len;
-			char *s = SvPV(code, len);
-			codestr_.assign(s, len);
+	// printf("DBG %s: threadable\n", fmt);
+	if (SvPOK(code)) {
+		STRLEN len;
+		char *s = SvPV(code, len);
+		codestr_.assign(s, len);
 
-			Erref err = compileCode(fname);
+		Erref err = compileCodeVa(fmt, ap);
 
-			if (err->hasError()) {
-				setErrMsg(err->print());
-				return false;
-			}
-			return true;
-		} else {
+		if (err->hasError()) {
+			throw Exception(err, false); // XXX add a heading message?
+		}
+	} else { 
+		if (!SvROK(code) || SvTYPE(SvRV(code)) != SVt_PVCV) {
+			string smsg = vstrprintf(fmt, ap);
+			throw Exception::f("%s: code must be a source code string or a reference to Perl function", smsg.c_str());
+		}
+
+		if (threadable_) {
 			threadable_ = false;
 			// here it's not a fatal error, just remember for the future,
 			// in case if someone would ever want to make a deep copy
-			errt_.f("the code is not a source code string");
+			string smsg = vstrprintf(fmt, ap);
+			errt_.f("%s: the code is not a source code string", smsg.c_str());
 		}
+
+		code_ = newSV(0);
+		sv_setsv(code_, code);
 	}
-
-	if (!SvROK(code) || SvTYPE(SvRV(code)) != SVt_PVCV) {
-		if (threadinit_)
-			setErrMsg( string(fname) + ": code must be a source code string or a reference to Perl function" );
-		else
-			setErrMsg( string(fname) + ": code must be a reference to Perl function" );
-		return false;
-	}
-
-	code_ = newSV(0);
-	sv_setsv(code_, code);
-
-	return true;
 }
 
 // Append another argument to args_.
@@ -211,7 +223,7 @@ bool PerlCallback::equals(const PerlCallback *other) const
 void PerlCallback::initialize(HoldRowTypes *holder)
 {
 	if (threadable_ && deepCopied_ && !errt_->hasError()) {
-		errt_ = compileCode("recompilation in a new thread");
+		errt_ = compileCodeFmt("recompilation in a new thread");
 		if (errt_->hasError())
 			return; // error remembered, nothing else to do
 
@@ -222,9 +234,18 @@ void PerlCallback::initialize(HoldRowTypes *holder)
 	}
 }
 
-Erref PerlCallback::compileCode(const char *fname)
+Erref PerlCallback::compileCodeFmt(const char *fmt, ...)
 {
-	// printf("DBG %s: source code\n", fname);
+	va_list ap;
+	va_start(ap, fmt);
+	Erref err = compileCodeVa(fmt, ap);
+	va_end(ap);
+	return err;
+}
+
+Erref PerlCallback::compileCodeVa(const char *fmt, va_list ap)
+{
+	// printf("DBG %s: source code\n", fmt);
 	// try to compile the code from a string
 	Erref err;
 
@@ -232,7 +253,7 @@ Erref PerlCallback::compileCode(const char *fname)
 
 	string subcode = "sub {\n";
 	subcode += codestr_;
-	subcode += "}\n";
+	subcode += "\n}\n";
 
 	SV *code = NULL;
 	dSP;
@@ -248,13 +269,21 @@ Erref PerlCallback::compileCode(const char *fname)
 
 	if (SvTRUE(ERRSV)) {
 		// printf("DBG compilation got an error\n");
-		err.f("%s: failed to compile the source code", fname);
+		va_list copy_ap;
+		va_copy(copy_ap, ap);
+		string smsg = vstrprintf(fmt, copy_ap);
+		va_end(copy_ap);
+		err.f("%s: failed to compile the source code", smsg.c_str());
 		err.f("Compilation error: %s", SvPV_nolen(ERRSV));
 	}
 
 	SPAGAIN;
 	if (nv < 1) { 
-		err.f("%s: source code compulation returned nothing", fname);
+		va_list copy_ap;
+		va_copy(copy_ap, ap);
+		string smsg = vstrprintf(fmt, copy_ap);
+		va_end(copy_ap);
+		err.f("%s: source code compilation returned nothing", smsg.c_str());
 	} else {
 		for (; nv > 1; nv--)
 			POPs;
@@ -269,9 +298,17 @@ Erref PerlCallback::compileCode(const char *fname)
 
 	if (!err->hasError()) {
 		if (code == NULL) {
-			err.f("%s: internal error: the source code compilation returned NULL", fname);
+			va_list copy_ap;
+			va_copy(copy_ap, ap);
+			string smsg = vstrprintf(fmt, copy_ap);
+			va_end(copy_ap);
+			err.f("%s: internal error: the source code compilation returned NULL", smsg.c_str());
 		} else if (!SvROK(code) || SvTYPE(SvRV(code)) != SVt_PVCV) {
-			err.f("%s: the source code compilation returned not a code object", fname);
+			va_list copy_ap;
+			va_copy(copy_ap, ap);
+			string smsg = vstrprintf(fmt, copy_ap);
+			va_end(copy_ap);
+			err.f("%s: the source code compilation returned not a code object", smsg.c_str());
 		}
 	}
 
@@ -329,28 +366,22 @@ Onceref<PerlLabel> PerlLabel::makeSimple(Unit *unit, const_Onceref<RowType> rtyp
 	const string &name, SV *code, const char *fmt, ...)
 {
 	Onceref<PerlCallback> clr = new PerlCallback();
-	if (!clr->setCode(get_sv("Triceps::_DEFAULT_CLEAR_LABEL", 0), "")) {
+	try {
+		clr->setCode(get_sv("Triceps::_DEFAULT_CLEAR_LABEL", 0), "");
+	} catch (Exception e) {
 		// should really never fail, but just in case
 		va_list ap;
 		va_start(ap, fmt);
 		string s = vstrprintf(fmt, ap);
 		va_end(ap);
-		throw Exception(strprintf("%s: internal error, bad value in $Triceps::_DEFAULT_CLEAR_LABEL", s.c_str()), false);
+		throw Exception::f("%s: internal error, bad value in $Triceps::_DEFAULT_CLEAR_LABEL", s.c_str());
 	}
 
 	Onceref<PerlCallback> cb = new PerlCallback();
-	if (!cb->setCode(code, "")) {
-		// should really never fail, but just in case
-		va_list ap;
-		va_start(ap, fmt);
-		string s = vstrprintf(fmt, ap);
-		va_end(ap);
-		const char *errtxt = ": unknown error in creating a Perl label";
-		SV *errmsg = get_sv("!", 0);
-		if (SvPOK(errmsg))
-			errtxt = SvPV_nolen(errmsg);
-		throw Exception(strprintf("%s%s", s.c_str(), errtxt), false);
-	}
+	string errmsg = "Label '";
+	errmsg += name;
+	errmsg += "'";
+	cb->setCode(code, errmsg.c_str()); // may throw
 	return new PerlLabel(unit, rtype, name, clr, cb);
 }
 
@@ -473,31 +504,43 @@ Onceref<PerlCallback> GetSvCall(SV *svptr, const char *fmt, ...)
 {
 	Autoref<PerlCallback> cb = new PerlCallback();
 
-	if (SvROK(svptr)) {
-		if (SvTYPE(SvRV(svptr)) == SVt_PVAV) {
-			AV *array = (AV*)SvRV(svptr);
-			int len = av_len(array)+1; // av_len returns the index of last element
-			if (len > 0) {
-				SV *code = *av_fetch(array, 0, 0);
-				if (SvROK(code) && SvTYPE(SvRV(code)) == SVt_PVCV) {
-					cb->setCode(code, ""); // can't fail
-					for (int i = 1; i < len; i++) { // pick up the args
-						cb->appendArg(*av_fetch(array, i, 0));
-					}
-					return cb;
-				}
-			}
-		} else if (SvTYPE(SvRV(svptr)) == SVt_PVCV) {
-			cb->setCode(svptr, ""); // can't fail
-			return cb;
-		}
-	}
-
 	va_list ap;
 	va_start(ap, fmt);
-	string s = vstrprintf(fmt, ap);
+
+	try {
+		if (SvROK(svptr)) {
+			if (SvTYPE(SvRV(svptr)) == SVt_PVAV) {
+				AV *array = (AV*)SvRV(svptr);
+				int len = av_len(array)+1; // av_len returns the index of last element
+				if (len > 0) {
+					SV *code = *av_fetch(array, 0, 0);
+					if (SvROK(code) && SvTYPE(SvRV(code)) == SVt_PVCV
+					|| SvPOK(code)) {
+						cb->setCodeVa(code, fmt, ap); // may throw
+						for (int i = 1; i < len; i++) { // pick up the args
+							cb->appendArg(*av_fetch(array, i, 0));
+						}
+						va_end(ap);
+						return cb;
+					}
+				}
+			} else if (SvTYPE(SvRV(svptr)) == SVt_PVCV) {
+				cb->setCodeVa(svptr, fmt, ap); // may throw
+				va_end(ap);
+				return cb;
+			}
+		} else if (SvPOK(svptr)) {
+			cb->setCodeVa(svptr, fmt, ap); // may throw
+			va_end(ap);
+			return cb;
+		}
+	} catch (Exception) {
+		va_end(ap);
+		throw;
+	}
+	string smsg = vstrprintf(fmt, ap);
 	va_end(ap);
-	throw TRICEPS_NS::Exception::f("%s value must be a reference to a function or an array starting with a reference to function", s.c_str());
+	throw TRICEPS_NS::Exception::f("%s value must be a reference to a function or an array starting with a reference to function", smsg.c_str());
 }
 
 }; // Triceps::TricepsPerl

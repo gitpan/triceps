@@ -1,6 +1,6 @@
 #!/usr/bin/perl
 #
-# (C) Copyright 2011-2013 Sergey A. Babkin.
+# (C) Copyright 2011-2014 Sergey A. Babkin.
 # This file is a part of Triceps.
 # See the file COPYRIGHT for the copyright notice and license information
 #
@@ -112,6 +112,7 @@ while(<STDIN>) {
 			s/<\/i>/<\/emphasis>/g;
 			s/<b>/<emphasis role="bold">/g;
 			s/<\/b>/<\/emphasis>/g;
+			s/<br\/>/<computeroutput>\n<\/computeroutput>/g;
 			print;
 		}
 	}

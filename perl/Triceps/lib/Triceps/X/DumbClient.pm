@@ -1,5 +1,5 @@
 #
-# (C) Copyright 2011-2013 Sergey A. Babkin.
+# (C) Copyright 2011-2014 Sergey A. Babkin.
 # This file is a part of Triceps.
 # See the file COPYRIGHT for the copyright notice and license information
 #
@@ -11,7 +11,7 @@ package Triceps::X::DumbClient;
 
 sub CLONE_SKIP { 1; }
 
-our $VERSION = 'v1.0.93';
+our $VERSION = 'v2.0.0';
 
 use Carp;
 use IO::Socket::INET;
@@ -43,7 +43,7 @@ sub run # ($labels)
 		PeerAddr => "localhost",
 		PeerPort => $port,
 	) or confess "socket failed: $!";
-	while(&readLine) {
+	while(& readLine) {
 		$sock->print($_);
 		$sock->flush();
 	}
@@ -51,7 +51,7 @@ sub run # ($labels)
 	$sock->flush();
 	$sock->shutdown(1); # SHUT_WR
 	while(<$sock>) {
-		&send($_);
+		& send($_);
 	}
 	waitpid($pid, 0);
 }

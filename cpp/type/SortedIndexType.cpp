@@ -1,5 +1,5 @@
 //
-// (C) Copyright 2011-2013 Sergey A. Babkin.
+// (C) Copyright 2011-2014 Sergey A. Babkin.
 // This file is a part of Triceps.
 // See the file COPYRIGHT for the copyright notice and license information
 //
@@ -21,9 +21,9 @@ namespace TRICEPS_NS {
 void SortedIndexCondition::initialize(Erref &errors, TableType *tabtype, SortedIndexType *indtype)
 { }
 
-const_Onceref<NameSet> SortedIndexCondition::getKey() const
+const NameSet *SortedIndexCondition::getKey() const
 {
-	return (NameSet *)NULL;
+	return NULL; // no key, yet
 }
 
 size_t SortedIndexCondition::sizeOfRhSection() const
@@ -122,7 +122,7 @@ void SortedIndexType::printTo(string &res, const string &indent, const string &s
 	printSubelementsTo(res, indent, subindent);
 }
 
-const_Onceref<NameSet> SortedIndexType::getKey() const
+const NameSet *SortedIndexType::getKey() const
 {
 	return sc_->getKey();
 }

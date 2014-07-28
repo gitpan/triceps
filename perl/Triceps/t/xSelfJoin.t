@@ -1,5 +1,5 @@
 #
-# (C) Copyright 2011-2013 Sergey A. Babkin.
+# (C) Copyright 2011-2014 Sergey A. Babkin.
 # This file is a part of Triceps.
 # See the file COPYRIGHT for the copyright notice and license information
 #
@@ -32,7 +32,7 @@ our $rtRate = Triceps::RowType->new( # an exchange rate between two currencies
 	ccy1 => "string", # currency code
 	ccy2 => "string", # currency code
 	rate => "float64", # multiplier when exchanging ccy1 to ccy2
-) or confess "$!";
+);
 
 # all exchange rates
 our $ttRate = Triceps::TableType->new($rtRate)
@@ -46,8 +46,8 @@ our $ttRate = Triceps::TableType->new($rtRate)
 		Triceps::IndexType->newHashed(key => [ "ccy2" ])
 		->addSubIndex("grouping", Triceps::IndexType->newFifo())
 	)
-or confess "$!";
-$ttRate->initialize() or confess "$!";
+;
+$ttRate->initialize();
 
 # input for the arbitration
 my @inputArb = (
@@ -74,8 +74,7 @@ sub doArbJoins {
 
 our $uArb = Triceps::Unit->new("uArb");
 
-our $tRate = $uArb->makeTable($ttRate, 
-	&Triceps::EM_CALL, "tRate") or confess "$!";
+our $tRate = $uArb->makeTable($ttRate, "tRate");
 
 our $join1 = Triceps::JoinTwo->new(
 	name => "join1",
@@ -94,10 +93,9 @@ our $ttJoin1 = Triceps::TableType->new($join1->getResultRowType())
 		Triceps::IndexType->newHashed(key => [ "ccy3", "ccy1" ])
 		->addSubIndex("grouping", Triceps::IndexType->newFifo())
 	)
-or confess "$!";
-$ttJoin1->initialize() or confess "$!";
-our $tJoin1 = $uArb->makeTable($ttJoin1,
-	&Triceps::EM_CALL, "tJoin1") or confess "$!";
+;
+$ttJoin1->initialize();
+our $tJoin1 = $uArb->makeTable($ttJoin1, "tJoin1");
 $join1->getOutputLabel()->chain($tJoin1->getInputLabel());
 
 our $join2 = Triceps::JoinTwo->new(
@@ -116,7 +114,7 @@ our $join2 = Triceps::JoinTwo->new(
 our $rtResult = Triceps::RowType->new(
 	$join2->getResultRowType()->getdef(),
 	looprate => "float64",
-) or confess "$!";
+);
 my $lbResult = $uArb->makeDummyLabel($rtResult, "lbResult");
 my $lbCompute = $uArb->makeLabel($join2->getResultRowType(), "lbCompute", undef, sub {
 	my ($label, $rowop) = @_;
@@ -131,7 +129,7 @@ my $lbCompute = $uArb->makeLabel($join2->getResultRowType(), "lbCompute", undef,
 	} else {
 			&send("__", $rowop->printP(), "looprate=$looprate \n"); # for debugging
 	}
-}) or confess "$!";
+});
 $join2->getOutputLabel()->chain($lbCompute);
 
 # label to print the changes to the detailed stats
@@ -200,8 +198,7 @@ sub doArbManual {
 
 our $uArb = Triceps::Unit->new("uArb");
 
-our $tRate = $uArb->makeTable($ttRate, 
-	&Triceps::EM_CALL, "tRate") or confess "$!";
+our $tRate = $uArb->makeTable($ttRate, "tRate");
 
 # now compute the resulting circular rate and filter the profitable loops
 our $rtResult = Triceps::RowType->new(
@@ -212,9 +209,9 @@ our $rtResult = Triceps::RowType->new(
 	rate2 => "float64",
 	rate3 => "float64",
 	looprate => "float64",
-) or confess "$!";
-my $ixtCcy1 = $ttRate->findSubIndex("byCcy1") or confess "$!";
-my $ixtCcy12 = $ixtCcy1->findSubIndex("byCcy12") or confess "$!";
+);
+my $ixtCcy1 = $ttRate->findSubIndex("byCcy1");
+my $ixtCcy12 = $ixtCcy1->findSubIndex("byCcy12");
 
 my $lbResult = $uArb->makeDummyLabel($rtResult, "lbResult");
 my $lbCompute = $uArb->makeLabel($rtRate, "lbCompute", undef, sub {
@@ -225,8 +222,7 @@ my $lbCompute = $uArb->makeLabel($rtRate, "lbCompute", undef, sub {
 	my $rate1 = $row->get("rate");
 
 	my $rhi = $tRate->findIdxBy($ixtCcy1, ccy1 => $ccy2);
-	my $rhiEnd = $rhi->nextGroupIdx($ixtCcy12)
-		or confess "$!";
+	my $rhiEnd = $rhi->nextGroupIdx($ixtCcy12);
 	for (; !$rhi->same($rhiEnd); $rhi = $rhi->nextIdx($ixtCcy12)) {
 		my $row2 = $rhi->getRow();
 		my $ccy3 = $row2->get("ccy2");
@@ -285,7 +281,7 @@ my $lbCompute = $uArb->makeLabel($rtRate, "lbCompute", undef, sub {
 			&send("__", $result->printP(), "\n"); # for debugging
 		}
 	}
-}) or confess "$!";
+});
 $tRate->getOutputLabel()->chain($lbCompute);
 makePrintLabel("lbPrint", $lbResult);
 
@@ -342,8 +338,7 @@ sub doArbLookupJoins {
 
 our $uArb = Triceps::Unit->new("uArb");
 
-our $tRate = $uArb->makeTable($ttRate, 
-	&Triceps::EM_CALL, "tRate") or confess "$!";
+our $tRate = $uArb->makeTable($ttRate, "tRate");
 
 our $join1 = Triceps::LookupJoin->new(
 	name => "join1",
@@ -370,7 +365,7 @@ our $join2 = Triceps::LookupJoin->new(
 our $rtResult = Triceps::RowType->new(
 	$join2->getResultRowType()->getdef(),
 	looprate => "float64",
-) or confess "$!";
+);
 my $lbResult = $uArb->makeDummyLabel($rtResult, "lbResult");
 my $lbCompute = $uArb->makeLabel($join2->getResultRowType(), "lbCompute", undef, sub {
 	my ($label, $rowop) = @_;
@@ -428,7 +423,7 @@ my $lbCompute = $uArb->makeLabel($join2->getResultRowType(), "lbCompute", undef,
 	} else {
 		&send("__", $result->printP(), "\n"); # for debugging
 	}
-}) or confess "$!";
+});
 $join2->getOutputLabel()->chain($lbCompute);
 
 # label to print the changes to the detailed stats

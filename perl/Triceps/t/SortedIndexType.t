@@ -1,5 +1,5 @@
 #
-# (C) Copyright 2011-2013 Sergey A. Babkin.
+# (C) Copyright 2011-2014 Sergey A. Babkin.
 # This file is a part of Triceps.
 # See the file COPYRIGHT for the copyright notice and license information
 #
@@ -120,9 +120,8 @@ ok($res, "index PerlSortedIndex(basic)");
 
 	$res = $tt1->initialize();
 	ok($res, 1);
-	#print STDERR "$!" . "\n";
 
-	my $t1 = $u1->makeTable($tt1, "EM_CALL", "t1");
+	my $t1 = $u1->makeTable($tt1, "t1");
 	ok(ref $t1, "Triceps::Table");
 
 	# insert rows in a backwards order
@@ -171,7 +170,6 @@ $itsrc1 = Triceps::IndexType->newPerlSorted("basic", undef, '
 	return $res;
 	'
 );
-#print "$!\n";
 ok(ref $itsrc1, "Triceps::IndexType");
 $res = $itsrc1->print();
 ok($res, "index PerlSortedIndex(basic)");
@@ -187,9 +185,8 @@ ok($res, "index PerlSortedIndex(basic)");
 
 	$res = $tt1->initialize();
 	ok($res, 1);
-	#print STDERR "$!" . "\n";
 
-	my $t1 = $u1->makeTable($tt1, "EM_CALL", "t1");
+	my $t1 = $u1->makeTable($tt1, "t1");
 	ok(ref $t1, "Triceps::Table");
 
 	# insert rows in a backwards order
@@ -240,7 +237,6 @@ ok($res, "index PerlSortedIndex(basic)");
 
 	$res = $tt1->initialize();
 	ok($res, 1);
-	#print STDERR "$!" . "\n";
 
 	# get back the copied object from the table type
 	$it2 = $tt1->findSubIndex("primary");
@@ -254,7 +250,7 @@ ok($res, "index PerlSortedIndex(basic)");
 		ok($flat2->isLeaf());
 	}
 	
-	my $t1 = $u1->makeTable($tt1, "EM_CALL", "t1");
+	my $t1 = $u1->makeTable($tt1, "t1");
 	ok(ref $t1, "Triceps::Table");
 
 	# insert rows in a backwards order, with multiple copies of some
@@ -320,9 +316,8 @@ sub testCompError # ($&comp)
 
 	$res = $tt1->initialize();
 	ok($res, 1);
-	#print STDERR "$!" . "\n";
 
-	my $t1 = $u1->makeTable($tt1, "EM_CALL", "t1");
+	my $t1 = $u1->makeTable($tt1, "t1");
 	ok(ref $t1, "Triceps::Table");
 
 	my $r11 = $rt1->makeRowHash(b => 1, c => 1);
@@ -375,9 +370,8 @@ sub testCompError # ($&comp)
 
 	$res = $tt1->initialize();
 	ok($res, 1);
-	#print STDERR "$!" . "\n";
 
-	my $t1 = $u1->makeTable($tt1, "EM_CALL", "t1");
+	my $t1 = $u1->makeTable($tt1, "t1");
 	ok(ref $t1, "Triceps::Table");
 
 	# insert rows in a backwards order
@@ -434,7 +428,7 @@ sub setComparator # (tabt, idxt, rowt,  comparator, cmpargs...)
 	$result .= $rowt->print();
 	$result .= "\n";
 	$idxt->setComparator(@comp);
-	return $!;
+	return undef; # success
 }
 
 {
@@ -449,7 +443,6 @@ sub setComparator # (tabt, idxt, rowt,  comparator, cmpargs...)
 
 	undef $result;
 	$res = $tt1->initialize();
-	#print STDERR "$!" . "\n";
 	ok($res, 1);
 	#print STDERR $result;
 	ok($result, 
@@ -477,11 +470,11 @@ row {
 	# try to set the comparator again, after initialization
 	$it2 = $tt1->findSubIndex("primary");
 	ok(ref $it2, "Triceps::IndexType");
-	$res = $it2->setComparator(\&compareByFields);
+	$res = eval { $it2->setComparator(\&compareByFields); };
 	ok(!defined $res);
-	ok($! . "", 'Triceps::IndexType::setComparator: this index type is already initialized and can not be changed');
+	ok($@, qr/^Triceps::IndexType::setComparator: this index type is already initialized and can not be changed at/);
 
-	my $t1 = $u1->makeTable($tt1, "EM_CALL", "t1");
+	my $t1 = $u1->makeTable($tt1, "t1");
 	ok(ref $t1, "Triceps::Table");
 
 	# insert rows in a backwards order
@@ -525,13 +518,12 @@ undef $result;
 		$result .= $rowt->print();
 		$result .= "\n";
 		$idxt->setComparator(@comp);
-		return $!;
+		return undef; # success
 	', undef, '
 		my $res = ($_[0]->get($_[2]) <=> $_[1]->get($_[2])
 			|| $_[0]->get($_[3]) <=> $_[1]->get($_[3]));
 		return $res;
 	', "b", "c");
-	#print "$!\n";
 	ok(ref $it2, "Triceps::IndexType");
 
 	my $tt1 = Triceps::TableType->new($rt1)
@@ -541,7 +533,6 @@ undef $result;
 
 	undef $result;
 	$res = $tt1->initialize();
-	#print STDERR "$!" . "\n";
 	ok($res, 1);
 	#print STDERR $result;
 	ok($result, 
@@ -569,11 +560,11 @@ row {
 	# try to set the comparator again, after initialization
 	$it2 = $tt1->findSubIndex("primary");
 	ok(ref $it2, "Triceps::IndexType");
-	$res = $it2->setComparator(\&compareByFields);
+	$res = eval { $it2->setComparator(\&compareByFields); };
 	ok(!defined $res);
-	ok($! . "", 'Triceps::IndexType::setComparator: this index type is already initialized and can not be changed');
+	ok($@, qr/^Triceps::IndexType::setComparator: this index type is already initialized and can not be changed at/);
 
-	my $t1 = $u1->makeTable($tt1, "EM_CALL", "t1");
+	my $t1 = $u1->makeTable($tt1, "t1");
 	ok(ref $t1, "Triceps::Table");
 
 	# insert rows in a backwards order
@@ -628,14 +619,13 @@ sub noComparator # (tabt, idxt, rowt,  comparator, cmpargs...)
 	ok(ref $tt1, "Triceps::TableType");
 
 	undef $result;
-	$res = $tt1->initialize();
+	$res = eval { $tt1->initialize(); };
 	ok(!defined $res);
-	#print STDERR "$!\n";
-	ok("$!", 
-"index error:
+	ok($@, 
+qr/^index error:
   nested index 1 'primary':
     initializer found an error!
-    error line 2");
+    error line 2 at/);
 }
 
 {
@@ -648,13 +638,12 @@ sub noComparator # (tabt, idxt, rowt,  comparator, cmpargs...)
 	ok(ref $tt1, "Triceps::TableType");
 
 	undef $result;
-	$res = $tt1->initialize();
+	$res = eval { $tt1->initialize(); };
 	ok(!defined $res);
-	#print STDERR "$!\n";
-	ok("$!", 
-"index error:
+	ok($@, 
+qr/^index error:
   nested index 1 'primary':
-    initializer died!");
+    initializer died! at/);
 }
 
 {
@@ -667,63 +656,62 @@ sub noComparator # (tabt, idxt, rowt,  comparator, cmpargs...)
 	ok(ref $tt1, "Triceps::TableType");
 
 	undef $result;
-	$res = $tt1->initialize();
+	$res = eval { $tt1->initialize(); };
 	ok(!defined $res);
-	#print STDERR "$!\n";
-	ok("$!", 
-"index error:
+	ok($@, 
+qr/^index error:
   nested index 1 'primary':
-    the mandatory comparator Perl function is not set by PerlSortedIndex(badInit)");
+    the mandatory comparator Perl function is not set by PerlSortedIndex\(badInit\) at/);
 }
 
 #########################
 # errors in compilation of source code
 
 {
-	my $it2 = Triceps::IndexType->newPerlSorted("badInit", '$zz++;', undef);
+	my $it2 = eval { Triceps::IndexType->newPerlSorted("badInit", '$zz++;', undef); };
 	ok(!defined $it2);
-	#print STDERR "error: $!\n";
-	ok("$!", 
-"Triceps::IndexType::newPerlSorted(initialize): failed to compile the source code
-Compilation error: Global symbol \"\$zz\" requires explicit package name at (eval 13) line 2.
+	ok($@, 
+qr/^Triceps::IndexType::newPerlSorted\(initialize\): failed to compile the source code
+Compilation error: Global symbol \"\$zz\" requires explicit package name at \(eval \d+\) line 2.
 The source code was:
   sub {
-  \$zz++;}");
+  \$zz\+\+;
+  } at/);
 }
 
 {
-	my $it2 = Triceps::IndexType->newPerlSorted("badInit", undef, '$zz++;');
+	my $it2 = eval { Triceps::IndexType->newPerlSorted("badInit", undef, '$zz++;'); };
 	ok(!defined $it2);
-	#print STDERR "error: $!\n";
-	ok("$!", 
-"Triceps::IndexType::newPerlSorted(compare): failed to compile the source code
-Compilation error: Global symbol \"\$zz\" requires explicit package name at (eval 14) line 2.
+	ok($@, 
+qr/^Triceps::IndexType::newPerlSorted\(compare\): failed to compile the source code
+Compilation error: Global symbol \"\$zz\" requires explicit package name at \(eval \d+\) line 2.
 The source code was:
   sub {
-  \$zz++;}");
+  \$zz\+\+;
+  } at/);
 }
 
 {
 	my $it2 = Triceps::IndexType->newPerlSorted("badInit", ' ', undef);
 	ok(ref $it2, "Triceps::IndexType");
 
-	ok(!defined $it2->setComparator('$zz++;'));
-	#print STDERR "error: $!\n";
-	ok("$!", 
-"Triceps::IndexType::setComparator: failed to compile the source code
-Compilation error: Global symbol \"\$zz\" requires explicit package name at (eval 16) line 2.
+	ok(!defined eval { $it2->setComparator('$zz++;') });
+	ok($@, 
+qr/^Triceps::IndexType::setComparator: failed to compile the source code
+Compilation error: Global symbol \"\$zz\" requires explicit package name at \(eval \d+\) line 2.
 The source code was:
   sub {
-  \$zz++;}");
+  \$zz\+\+;
+  } at/);
 }
 
 #########################
 # both callbacks as undefs
 
 {
-	my $it2 = Triceps::IndexType->newPerlSorted("badInit", undef, undef, "a");
+	my $it2 = eval { Triceps::IndexType->newPerlSorted("badInit", undef, undef, "a"); };
 	ok(!defined $it2);
-	ok("$!", 'Triceps::IndexType::newPerlSorted: at least one of init and comparator function arguments must be not undef');
+	ok($@, qr/^Triceps::IndexType::newPerlSorted: at least one of init and comparator function arguments must be not undef at/);
 }
 
 #########################
@@ -731,11 +719,11 @@ The source code was:
 
 {
 	my $it2;
-	$it2 = Triceps::IndexType->newPerlSorted("badInit", 1, undef, "a");
+	$it2 = eval { Triceps::IndexType->newPerlSorted("badInit", 1, undef, "a"); };
 	ok(!defined $it2);
-	ok("$!", "Triceps::IndexType::newPerlSorted(initialize): code must be a source code string or a reference to Perl function");
+	ok($@, qr/^Triceps::IndexType::newPerlSorted\(initialize\): code must be a source code string or a reference to Perl function at/);
 
-	$it2 = Triceps::IndexType->newPerlSorted("badInit", undef, 1, "a");
+	$it2 = eval { Triceps::IndexType->newPerlSorted("badInit", undef, 1, "a"); };
 	ok(!defined $it2);
-	ok("$!", "Triceps::IndexType::newPerlSorted(compare): code must be a source code string or a reference to Perl function");
+	ok($@, qr/^Triceps::IndexType::newPerlSorted\(compare\): code must be a source code string or a reference to Perl function at/);
 }

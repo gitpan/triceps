@@ -1,5 +1,5 @@
 #
-# (C) Copyright 2011-2013 Sergey A. Babkin.
+# (C) Copyright 2011-2014 Sergey A. Babkin.
 # This file is a part of Triceps.
 # See the file COPYRIGHT for the copyright notice and license information
 #
@@ -9,7 +9,7 @@ package Triceps::Fields;
 
 sub CLONE_SKIP { 1; }
 
-our $VERSION = 'v1.0.93';
+our $VERSION = 'v2.0.0';
 
 use Carp;
 
@@ -204,8 +204,8 @@ sub makeTranslation # (optName => optValue, ...)
 			);
 		}';
 
-	my $result_rt = Triceps::RowType->new(@rowdef)
-		or confess "$myname: Invalid result row type specification: $! ";
+	my $result_rt = Triceps::RowType->new(@rowdef);
+		# XXX extended error "$myname: Invalid result row type specification: $! ";
 
 	${$opts->{saveCodeTo}} = $gencode if (defined($opts->{saveCodeTo}));
 

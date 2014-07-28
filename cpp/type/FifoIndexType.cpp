@@ -1,5 +1,5 @@
 //
-// (C) Copyright 2011-2013 Sergey A. Babkin.
+// (C) Copyright 2011-2014 Sergey A. Babkin.
 // This file is a part of Triceps.
 // See the file COPYRIGHT for the copyright notice and license information
 //
@@ -40,6 +40,7 @@ FifoIndexType::FifoIndexType(const FifoIndexType &orig, HoldRowTypes *holder) :
 FifoIndexType *FifoIndexType::setLimit(size_t limit)
 {
 	if (initialized_) {
+		Autoref<FifoIndexType> cleaner = this;
 		throw Exception::fTrace("Attempted to set the limit value on an initialized Fifo index type");
 	}
 	limit_ = limit;
@@ -49,6 +50,7 @@ FifoIndexType *FifoIndexType::setLimit(size_t limit)
 FifoIndexType *FifoIndexType::setJumping(bool jumping)
 {
 	if (initialized_) {
+		Autoref<FifoIndexType> cleaner = this;
 		throw Exception::fTrace("Attempted to set the jumping mode on an initialized Fifo index type");
 	}
 	jumping_ = jumping;
@@ -58,15 +60,16 @@ FifoIndexType *FifoIndexType::setJumping(bool jumping)
 FifoIndexType *FifoIndexType::setReverse(bool reverse)
 {
 	if (initialized_) {
+		Autoref<FifoIndexType> cleaner = this;
 		throw Exception::fTrace("Attempted to set the reverse mode on an initialized Fifo index type");
 	}
 	reverse_ = reverse;
 	return this;
 }
 
-const_Onceref<NameSet> FifoIndexType::getKey() const
+const NameSet *FifoIndexType::getKey() const
 {
-	return const_Onceref<NameSet>(); // NULL, no keys
+	return NULL; // no keys
 }
 
 bool FifoIndexType::equals(const Type *t) const

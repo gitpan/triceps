@@ -1,5 +1,5 @@
 //
-// (C) Copyright 2011-2013 Sergey A. Babkin.
+// (C) Copyright 2011-2014 Sergey A. Babkin.
 // This file is a part of Triceps.
 // See the file COPYRIGHT for the copyright notice and license information
 //
@@ -35,6 +35,9 @@ public:
 	// Which allows to report the start failures even before the OS
 	// thread is created.
 	//
+	// The TrieadOwner gets the fileInterrupt_ assigned from this object's
+	// fileInterrupt().
+	//
 	// After start, automatically calls defineJoin() in the app.
 	// If it fails, will abort the App and throws the Exception.
 	//
@@ -46,6 +49,8 @@ public:
 	// Start the thread's execution using the TrieadOwner
 	// created before by the caller. The rest of it is exacly like
 	// start(Autoref<App> app).
+	// The TrieadOwner gets the fileInterrupt_ assigned from this object's
+	// fileInterrupt().
 	void start(Autoref<TrieadOwner> to);
 
 	// Define this one for the code of your thread.

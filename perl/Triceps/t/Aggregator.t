@@ -1,5 +1,5 @@
 #
-# (C) Copyright 2011-2013 Sergey A. Babkin.
+# (C) Copyright 2011-2014 Sergey A. Babkin.
 # This file is a part of Triceps.
 # See the file COPYRIGHT for the copyright notice and license information
 #
@@ -15,7 +15,7 @@
 use ExtUtils::testlib;
 
 use Test;
-BEGIN { plan tests => 95 };
+BEGIN { plan tests => 94 };
 use Triceps;
 ok(2); # If we made it this far, we're ok.
 
@@ -34,7 +34,6 @@ ok(ref $u1, "Triceps::Unit");
 $trsn1 = Triceps::UnitTracerStringName->new();
 ok(ref $trsn1, "Triceps::UnitTracerStringName");
 $u1->setTracer($trsn1);
-ok($! . "", "");
 
 $u2 = Triceps::Unit->new("u2");
 ok(ref $u2, "Triceps::Unit");
@@ -76,8 +75,8 @@ sub aggHandler1 # (table, context, aggop, opcode, rh, state, args...)
 		unless (defined $args[0]);
 
 	$agghistory .= "call (" . join(", ", @args) . ") " . &Triceps::aggOpString($aggop) . " " . &Triceps::opcodeString($opcode);
-	my $row = $rh->getRow();
-	if (defined $row) {
+	if (!$rh->isNull()) {
+		my $row = $rh->getRow();
 		$agghistory .= " [" . join(", ", $rh->getRow()->toArray()) . "]\n";
 	} else {
 		$agghistory .= " NULL\n";
@@ -146,9 +145,8 @@ ok(ref $tt1, "Triceps::TableType");
 
 $res = $tt1->initialize();
 ok($res, 1);
-#print STDERR "$!" . "\n";
 
-$t1 = $u1->makeTable($tt1, "EM_SCHEDULE", "tab1");
+$t1 = $u1->makeTable($tt1, "tab1");
 ok(ref $t1, "Triceps::Table");
 
 # connect the history recording label
@@ -277,9 +275,8 @@ ok(ref $tt2, "Triceps::TableType");
 
 $res = $tt2->initialize();
 ok($res, 1);
-#print STDERR "$!" . "\n";
 
-$t2 = $u1->makeTable($tt2, "EM_SCHEDULE", "tab2");
+$t2 = $u1->makeTable($tt2, "tab2");
 ok(ref $t2, "Triceps::Table");
 
 # connect the history recording label, same one as in test 1
@@ -291,7 +288,6 @@ ok($res, 1);
 # send the same records 
 
 $res = $t2->insert($r1);
-#print STDERR "error: $!\n";
 ok($res == 1);
 $res = $t2->insert($r2);
 ok($res == 1);
@@ -334,8 +330,8 @@ sub aggHandler3 # (table, context, aggop, opcode, rh, state, args...)
 	$agghistory .= "bad context type " . ref($context) unless (ref($context) eq "Triceps::AggregatorContext");
 
 	$agghistory .= "call (" . join(", ", @args) . ") " . &Triceps::aggOpString($aggop) . " " . &Triceps::opcodeString($opcode);
-	my $row = $rh->getRow();
-	if (defined $row) {
+	if (!$rh->isNull()) {
+		my $row = $rh->getRow();
 		$agghistory .= " [" . join(", ", $rh->getRow()->toArray()) . "]\n";
 	} else {
 		$agghistory .= " NULL\n";
@@ -394,9 +390,8 @@ ok(ref $tt3, "Triceps::TableType");
 
 $res = $tt3->initialize();
 ok($res, 1);
-#print STDERR "$!" . "\n";
 
-$t3 = $u1->makeTable($tt3, "EM_SCHEDULE", "tab3");
+$t3 = $u1->makeTable($tt3, "tab3");
 ok(ref $t3, "Triceps::Table");
 
 # connect the history recording label, same one as in test 1
@@ -408,7 +403,6 @@ ok($res, 1);
 # send the same records 
 
 $res = $t3->insert($r1);
-#print STDERR "error: $!\n";
 ok($res == 1);
 $res = $t3->insert($r2);
 ok($res == 1);
@@ -509,9 +503,8 @@ ok(ref $tt4, "Triceps::TableType");
 
 $res = $tt4->initialize();
 ok($res, 1);
-#print STDERR "$!" . "\n";
 
-$t4 = $u1->makeTable($tt4, "EM_SCHEDULE", "tab4");
+$t4 = $u1->makeTable($tt4, "tab4");
 ok(ref $t4, "Triceps::Table");
 
 # remember the reverse index for the aggregator
@@ -527,7 +520,6 @@ ok($res, 1);
 # send the same records (slightly different order)
 
 $res = $t4->insert($r1);
-#print STDERR "error: $!\n";
 ok($res == 1);
 $res = $t4->insert($r2);
 ok($res == 1);
@@ -616,9 +608,8 @@ ok(ref $tt2, "Triceps::TableType");
 
 $res = $tt2->initialize();
 ok($res, 1);
-#print STDERR "$!" . "\n";
 
-$t2 = $u1->makeTable($tt2, "EM_SCHEDULE", "tab2");
+$t2 = $u1->makeTable($tt2, "tab2");
 ok(ref $t2, "Triceps::Table");
 
 # connect the history recording label, same one as in test 1
@@ -630,7 +621,6 @@ ok($res, 1);
 # send the same records 
 
 $res = $t2->insert($r1);
-#print STDERR "error: $!\n";
 ok($res == 1);
 $res = $t2->insert($r2);
 ok($res == 1);
@@ -682,9 +672,8 @@ ok(ref $tt2, "Triceps::TableType");
 
 $res = $tt2->initialize();
 ok($res, 1);
-#print STDERR "$!\n";
 
-$t2 = $u1->makeTable($tt2, "EM_SCHEDULE", "tab2");
+$t2 = $u1->makeTable($tt2, "tab2");
 ok(ref $t2, "Triceps::Table");
 
 eval { $t2->insert($r1); };
@@ -712,9 +701,8 @@ ok(ref $tt2, "Triceps::TableType");
 
 $res = $tt2->initialize();
 ok($res, 1);
-#print STDERR "$!\n";
 
-$t2 = $u1->makeTable($tt2, "EM_SCHEDULE", "tab2");
+$t2 = $u1->makeTable($tt2, "tab2");
 ok(ref $t2, "Triceps::Table");
 
 eval { $t2->insert($r1); };

@@ -1,5 +1,5 @@
 //
-// (C) Copyright 2011-2013 Sergey A. Babkin.
+// (C) Copyright 2011-2014 Sergey A. Babkin.
 // This file is a part of Triceps.
 // See the file COPYRIGHT for the copyright notice and license information
 //
@@ -311,13 +311,12 @@ protected:
 	// A Table is normally created by a TableType as a factory.
 	//
 	// @param unit - unit where the table belongs
-	// @param emode - enqueueing mode for the rowops produced in the table
 	// @param name - name of the table (name and a dot will prefix all the labels, the
 	//        input label will be name.in, output label name.out)
 	// @param tt - table type
 	// @param rowt - type of rows in the table
 	// @param handt - type of row handles, created inside the table type
-	Table(Unit *unit, EnqMode emode, const string &name, 
+	Table(Unit *unit, const string &name, 
 		const TableType *tt, const RowType *rowt, const RowHandleType *handt);
 
 protected:

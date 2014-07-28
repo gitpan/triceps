@@ -1,5 +1,5 @@
 #
-# (C) Copyright 2011-2013 Sergey A. Babkin.
+# (C) Copyright 2011-2014 Sergey A. Babkin.
 # This file is a part of Triceps.
 # See the file COPYRIGHT for the copyright notice and license information
 #
@@ -10,7 +10,7 @@
 use ExtUtils::testlib;
 
 use Test;
-BEGIN { plan tests => 14 };
+BEGIN { plan tests => 15 };
 use Triceps;
 use Triceps::X::TestFeed qw(:all);
 use Carp;
@@ -32,7 +32,7 @@ our $rtTrade = Triceps::RowType->new(
 	symbol => "string", # symbol traded
 	price => "float64",
 	size => "float64", # number of shares traded
-) or confess "$!";
+);
 
 our $ttWindow = Triceps::TableType->new($rtTrade)
 	->addSubIndex("bySymbol", 
@@ -41,34 +41,81 @@ our $ttWindow = Triceps::TableType->new($rtTrade)
 				Triceps::IndexType->newFifo(limit => 2)
 			)
 	)
-	or confess "$!";
-$ttWindow->initialize() or confess "$!";
+;
+$ttWindow->initialize();
 
 #########################
 # A basic manual test of echo server.
 
 if (0) {
-	my $uEcho = Triceps::Unit->new("uEcho");
-	my $lbEcho = $uEcho->makeLabel($rtTrade, "echo", undef, sub {
-		&outCurBuf($_[1]->printP() . "\n");
-	});
-	my $lbEcho2 = $uEcho->makeLabel($rtTrade, "echo2", undef, sub {
-		&outCurBuf(join(",", "echo", &Triceps::opcodeString($_[1]->getOpcode()),
-			$_[1]->getRow()->toArray()) . "\n");
-	});
-	my $lbExit = $uEcho->makeLabel($rtTrade, "exit", undef, sub {
-		$Triceps::X::SimpleServer::srv_exit = 1;
-	});
 
-	my %dispatch;
-	$dispatch{"echo"} = $lbEcho;
-	$dispatch{"echo2"} = $lbEcho2;
-	$dispatch{"exit"} = $lbExit;
+use strict;
+use Triceps::X::SimpleServer qw(:all);
 
-	my ($port, $pid) = &Triceps::X::SimpleServer::startServer(0, \%dispatch);
-	print STDERR "port=$port pid=$pid\n";
-	waitpid($pid, 0);
-	exit(0);
+my $uEcho = Triceps::Unit->new("uEcho");
+my $lbEcho = $uEcho->makeLabel($rtTrade, "echo", undef, sub {
+	&outCurBuf($_[1]->printP() . "\n");
+});
+my $lbEcho2 = $uEcho->makeLabel($rtTrade, "echo2", undef, sub {
+	&outCurBuf(join(",", "echo", &Triceps::opcodeString($_[1]->getOpcode()),
+		$_[1]->getRow()->toArray()) . "\n");
+});
+my $lbExit = $uEcho->makeLabel($rtTrade, "exit", undef, sub {
+	$Triceps::X::SimpleServer::srv_exit = 1;
+});
+
+my %dispatch;
+$dispatch{"echo"} = $lbEcho;
+$dispatch{"echo2"} = $lbEcho2;
+$dispatch{"exit"} = $lbExit;
+
+my ($port, $pid) = &Triceps::X::SimpleServer::startServer(0, \%dispatch);
+print STDERR "port=$port pid=$pid\n";
+waitpid($pid, 0);
+exit(0);
+
+}
+
+#########################
+# An echo server running through DumbClient.
+
+{
+
+use strict;
+use Triceps::X::SimpleServer qw(:all);
+
+my $uEcho = Triceps::Unit->new("uEcho");
+my $lbEcho = $uEcho->makeLabel($rtTrade, "echo", undef, sub {
+	&outCurBuf($_[1]->printP() . "\n");
+});
+my $lbEcho2 = $uEcho->makeLabel($rtTrade, "echo2", undef, sub {
+	&outCurBuf(join(",", "echo", &Triceps::opcodeString($_[1]->getOpcode()),
+		$_[1]->getRow()->toArray()) . "\n");
+});
+my $lbExit = $uEcho->makeLabel($rtTrade, "exit", undef, sub {
+	$Triceps::X::SimpleServer::srv_exit = 1;
+});
+
+my %dispatch;
+$dispatch{"echo"} = $lbEcho;
+$dispatch{"echo2"} = $lbEcho2;
+$dispatch{"exit"} = $lbExit;
+
+my @inputQuery = (
+"echo,OP_INSERT,1,a,2,3.4\n",
+"echo2,OP_INSERT,1,a,2,3.4\n",
+);
+my $expectQuery = 
+'> echo,OP_INSERT,1,a,2,3.4
+> echo2,OP_INSERT,1,a,2,3.4
+echo OP_INSERT id="1" symbol="a" price="2" size="3.4" 
+echo,OP_INSERT,1,a,2,3.4
+';
+
+Triceps::X::TestFeed::setInputLines(@inputQuery);
+Triceps::X::DumbClient::run(\%dispatch);
+
+ok(&Triceps::X::TestFeed::getResultLines(), $expectQuery);
 }
 
 #########################
@@ -135,8 +182,7 @@ sub runQuery1
 {
 
 my $uTrades = Triceps::Unit->new("uTrades");
-my $tWindow = $uTrades->makeTable($ttWindow, "EM_CALL", "tWindow")
-	or confess "$!";
+my $tWindow = $uTrades->makeTable($ttWindow, "tWindow");
 my $query = Query1->new($tWindow, "qWindow");
 my $srvout = &Triceps::X::SimpleServer::makeServerOutLabel($query->getOutputLabel());
 
@@ -190,8 +236,7 @@ sub new # ($class, $unit, $tabType, $name)
 	my $tabType = shift;
 	my $name = shift;
 
-	my $table = $unit->makeTable($tabType, "EM_CALL", $name)
-		or confess "Query2 table creation failed: $!";
+	my $table = $unit->makeTable($tabType, $name);
 	my $rt = $table->getRowType();
 
 	my $self = {};
@@ -388,8 +433,7 @@ sub runQuery3
 {
 
 my $uTrades = Triceps::Unit->new("uTrades");
-my $tWindow = $uTrades->makeTable($ttWindow, "EM_CALL", "tWindow")
-	or confess "$!";
+my $tWindow = $uTrades->makeTable($ttWindow, "tWindow");
 my $query = Query3->new(table => $tWindow, name => "qWindow");
 my $srvout = &Triceps::X::SimpleServer::makeServerOutLabel($query->getOutputLabel());
 
@@ -507,8 +551,7 @@ sub runQuery4
 {
 
 my $uTrades = Triceps::Unit->new("uTrades");
-my $tWindow = $uTrades->makeTable($ttWindow, "EM_CALL", "tWindow")
-	or confess "$!";
+my $tWindow = $uTrades->makeTable($ttWindow, "tWindow");
 my $cmpcode;
 my $query = Query4->new(table => $tWindow, name => "qWindow",
 	fields => ["symbol", "price"]);
@@ -560,8 +603,7 @@ sub runQuery4a
 {
 
 my $uTrades = Triceps::Unit->new("uTrades");
-my $tWindow = $uTrades->makeTable($ttWindow, "EM_CALL", "tWindow")
-	or confess "$!";
+my $tWindow = $uTrades->makeTable($ttWindow, "tWindow");
 my $query = Query4->new(table => $tWindow, name => "qWindow");
 my $srvout = &Triceps::X::SimpleServer::makeServerOutLabel($query->getOutputLabel());
 
@@ -713,8 +755,7 @@ sub runQuery5
 {
 
 my $uTrades = Triceps::Unit->new("uTrades");
-my $tWindow = $uTrades->makeTable($ttWindow, "EM_CALL", "tWindow")
-	or confess "$!";
+my $tWindow = $uTrades->makeTable($ttWindow, "tWindow");
 my $cmpcode;
 my $query = Query5->new(table => $tWindow, name => "qWindow",
 	fields => ["symbol", "price"], saveCodeTo => \$cmpcode );
@@ -785,8 +826,7 @@ sub runQuery5a
 {
 
 my $uTrades = Triceps::Unit->new("uTrades");
-my $tWindow = $uTrades->makeTable($ttWindow, "EM_CALL", "tWindow")
-	or confess "$!";
+my $tWindow = $uTrades->makeTable($ttWindow, "tWindow");
 my $query = Query5->new(table => $tWindow, name => "qWindow");
 my $srvout = &Triceps::X::SimpleServer::makeServerOutLabel($query->getOutputLabel());
 
@@ -886,7 +926,11 @@ sub genComparison # ($self, $query)
 			{
 				use strict;';
 
-	while (($f, $v) = each %qhash) {
+	# the sorting keeps the key order predictable for the tests;
+	# the can also be done with Hash::Util::hash_traversal_mask() 
+	# but would not be backwards-compatible
+	foreach $f (sort keys %qhash) {
+		$v = $qhash{$f};
 		next unless($v);
 		my $t = $rtdef{$f};
 
@@ -942,8 +986,7 @@ sub runQuery6
 {
 
 my $uTrades = Triceps::Unit->new("uTrades");
-my $tWindow = $uTrades->makeTable($ttWindow, "EM_CALL", "tWindow")
-	or confess "$!";
+my $tWindow = $uTrades->makeTable($ttWindow, "tWindow");
 my $query = Query6->new(table => $tWindow, name => "qWindow",);
 my $srvout = &Triceps::X::SimpleServer::makeServerOutLabel($query->getOutputLabel());
 
@@ -990,10 +1033,10 @@ Compiled comparator:
 			sub # ($query, $data)
 			{
 				use strict;
-				return 0 if ($_[0]->get("symbol")
-					ne $_[1]->get("symbol"));
 				return 0 if ($_[0]->get("id")
 					!= $_[1]->get("id"));
+				return 0 if ($_[0]->get("symbol")
+					ne $_[1]->get("symbol"));
 				return 1; # all succeeded
 			}
 qWindow.out,OP_INSERT,5,AAA,30,30
@@ -1099,8 +1142,7 @@ sub runQuery7
 
 
 my $uTrades = Triceps::Unit->new("uTrades");
-my $tWindow = $uTrades->makeTable($ttWindow, "EM_CALL", "tWindow")
-	or confess "$!";
+my $tWindow = $uTrades->makeTable($ttWindow, "tWindow");
 my $query = Query7->new(table => $tWindow, name => "qWindow",
 	resultFields => [ '!id', 'size/lot_$&', '.*' ],
 );
@@ -1205,8 +1247,7 @@ sub runServerOutputFromLabel
 {
 
 my $uTrades = Triceps::Unit->new("uTrades");
-my $tWindow = $uTrades->makeTable($ttWindow, "EM_CALL", "tWindow")
-	or confess "$!";
+my $tWindow = $uTrades->makeTable($ttWindow, "tWindow");
 my $query = Query1->new($tWindow, "qWindow");
 my $srvout = ServerOutput->new(fromLabel => $query->getOutputLabel());
 
@@ -1230,8 +1271,7 @@ sub runServerOutputFromRowType
 {
 
 my $uTrades = Triceps::Unit->new("uTrades");
-my $tWindow = $uTrades->makeTable($ttWindow, "EM_CALL", "tWindow")
-	or confess "$!";
+my $tWindow = $uTrades->makeTable($ttWindow, "tWindow");
 my $query = Query1->new($tWindow, "qWindow");
 my $srvout = ServerOutput->new(
 	name => "out",
@@ -1335,8 +1375,7 @@ sub runServerOutput2FromLabel
 {
 
 my $uTrades = Triceps::Unit->new("uTrades");
-my $tWindow = $uTrades->makeTable($ttWindow, "EM_CALL", "tWindow")
-	or confess "$!";
+my $tWindow = $uTrades->makeTable($ttWindow, "tWindow");
 my $query = Query1->new($tWindow, "qWindow");
 my $srvout = ServerOutput2->new(
 	unit => $uTrades,
@@ -1363,8 +1402,7 @@ sub runServerOutput2FromRowType
 {
 
 my $uTrades = Triceps::Unit->new("uTrades");
-my $tWindow = $uTrades->makeTable($ttWindow, "EM_CALL", "tWindow")
-	or confess "$!";
+my $tWindow = $uTrades->makeTable($ttWindow, "tWindow");
 my $query = Query1->new($tWindow, "qWindow");
 my $srvout = ServerOutput2->new(
 	name => "out",

@@ -1,5 +1,5 @@
 #
-# (C) Copyright 2011-2013 Sergey A. Babkin.
+# (C) Copyright 2011-2014 Sergey A. Babkin.
 # This file is a part of Triceps.
 # See the file COPYRIGHT for the copyright notice and license information
 #
@@ -9,7 +9,7 @@ package Triceps::Collapse;
 
 sub CLONE_SKIP { 1; }
 
-our $VERSION = 'v1.0.93';
+our $VERSION = 'v2.0.0';
 
 use Carp;
 use strict;
@@ -49,15 +49,14 @@ sub new # ($class, $optName => $optValue, ...)
 	$self->{dsetnames} = [];
 	
 	# parse the data element
-	my $dataref = $self->{data};
+	my %data_unparsed = @{$self->{data}};
 	my $dataset = {};
-	# dataref->[1] is the best guess for the dataset name, in case if the option "name" goes first
-	&Triceps::Opt::parse("$class data set (" . $dataref->[1] . ")", $dataset, {
+	&Triceps::Opt::parse("$class data set (" . ($data_unparsed{name} or 'UNKNOWN') . ")", $dataset, {
 		name => [ undef, \&Triceps::Opt::ck_mandatory ],
 		key => [ undef, sub { &Triceps::Opt::ck_mandatory(@_); &Triceps::Opt::ck_ref(@_, "ARRAY", "") } ],
 		rowType => [ undef, sub { &Triceps::Opt::ck_ref(@_, "Triceps::RowType"); } ],
 		fromLabel => [ undef, sub { &Triceps::Opt::ck_ref(@_, "Triceps::Label"); } ],
-	}, @$dataref);
+	}, @{$self->{data}});
 
 	# save the dataset for the future
 	push @{$self->{dsetnames}}, $dataset->{name};
@@ -74,25 +73,25 @@ sub new # ($class, $optName => $optValue, ...)
 		->addSubIndex("primary", 
 			Triceps::IndexType->newHashed(key => $dataset->{key})
 		);
-	$dataset->{tt}->initialize() 
-		or confess "Collapse table type creation error for dataset '" . $dataset->{name} . "':\n$! ";
+	$dataset->{tt}->initialize();
+		# XXX extended error or confess "Collapse table type creation error for dataset '" . $dataset->{name} . "':\n$! ";
 
-	$dataset->{tbInsert} = $self->{unit}->makeTable($dataset->{tt}, "EM_CALL", $self->{name} . "." . $dataset->{name} . ".tbInsert")
-		or confess "Collapse internal error: insert table creation for dataset '" . $dataset->{name} . "':\n$! ";
-	$dataset->{tbDelete} = $self->{unit}->makeTable($dataset->{tt}, "EM_CALL", $self->{name} . "." . $dataset->{name} . ".tbDelete")
-		or confess "Collapse internal error: delete table creation for dataset '" . $dataset->{name} . "':\n$! ";
+	$dataset->{tbInsert} = $self->{unit}->makeTable($dataset->{tt}, $self->{name} . "." . $dataset->{name} . ".tbInsert");
+		# XXX extended error "Collapse internal error: insert table creation for dataset '" . $dataset->{name} . "':\n$! ";
+	$dataset->{tbDelete} = $self->{unit}->makeTable($dataset->{tt}, $self->{name} . "." . $dataset->{name} . ".tbDelete");
+		# XXX extended error "Collapse internal error: delete table creation for dataset '" . $dataset->{name} . "':\n$! ";
 
 	# create the labels
 	$dataset->{lbIn} = $self->{unit}->makeLabel($dataset->{rowType}, $self->{name} . "." . $dataset->{name} . ".in", 
-		undef, \&_handleInput, $self, $dataset)
-			or confess "Collapse internal error: input label creation for dataset '" . $dataset->{name} . "':\n$! ";
-	$dataset->{lbOut} = $self->{unit}->makeDummyLabel($dataset->{rowType}, $self->{name} . "." . $dataset->{name} . ".out")
-		or confess "Collapse internal error: output label creation for dataset '" . $dataset->{name} . "':\n$! ";
+		undef, \&_handleInput, $self, $dataset);
+			# XXX extended error "Collapse internal error: input label creation for dataset '" . $dataset->{name} . "':\n$! ";
+	$dataset->{lbOut} = $self->{unit}->makeDummyLabel($dataset->{rowType}, $self->{name} . "." . $dataset->{name} . ".out");
+		# XXX extended error "Collapse internal error: output label creation for dataset '" . $dataset->{name} . "':\n$! ";
 			
 	# chain the input label, if any
 	if (defined $lbFrom) {
 		$lbFrom->chain($dataset->{lbIn});
-		# or confess "Collapse internal error: input label chaining for dataset '" . $dataset->{name} . "' to '" . $lbFrom->getName() . "' failed:\n$! ";
+		# XXX extended error "Collapse internal error: input label chaining for dataset '" . $dataset->{name} . "' to '" . $lbFrom->getName() . "' failed:\n$! ";
 		delete $dataset->{fromLabel}; # no need to keep the reference any more, avoid a reference cycle
 	}
 

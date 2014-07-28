@@ -1,5 +1,5 @@
 #
-# (C) Copyright 2011-2013 Sergey A. Babkin.
+# (C) Copyright 2011-2014 Sergey A. Babkin.
 # This file is a part of Triceps.
 # See the file COPYRIGHT for the copyright notice and license information
 #
@@ -121,10 +121,10 @@ ok(ref $vu3, "Triceps::Unit");
 my %result;
 
 # the accounts table type is also reused from example (1)
-$tAccounts3 = $vu3->makeTable($ttAccounts, &Triceps::EM_CALL, "Accounts");
+$tAccounts3 = $vu3->makeTable($ttAccounts, "Accounts");
 ok(ref $tAccounts3, "Triceps::Table");
 
-$tAccounts3dup = $vu3->makeTable($ttAccountsDup, &Triceps::EM_CALL, "Accounts");
+$tAccounts3dup = $vu3->makeTable($ttAccountsDup, "Accounts");
 ok(ref $tAccounts3dup, "Triceps::Table");
 
 # add a chance to act betfore the account table gets modified, for self-join
@@ -177,7 +177,7 @@ $ttTrans3 = Triceps::TableType->new($rtTrans3)
 ; 
 ok(ref $ttTrans3, "Triceps::TableType");
 ok($ttTrans3->initialize());
-$tTrans3 = $vu3->makeTable($ttTrans3, &Triceps::EM_CALL, "Trans");
+$tTrans3 = $vu3->makeTable($ttTrans3, "Trans");
 ok(ref $tTrans3, "Triceps::Table");
 $intrans3 = $tTrans3->getInputLabel();
 ok(ref $intrans3, "Triceps::Label");
@@ -191,7 +191,7 @@ $ttTrans3p = Triceps::TableType->new($rtTrans3)
 ; 
 ok(ref $ttTrans3p, "Triceps::TableType");
 ok($ttTrans3p->initialize());
-$tTrans3p = $vu3->makeTable($ttTrans3p, &Triceps::EM_CALL, "Trans");
+$tTrans3p = $vu3->makeTable($ttTrans3p, "Trans");
 ok(ref $tTrans3p, "Triceps::Table");
 $intrans3p = $tTrans3p->getInputLabel();
 ok(ref $intrans3p, "Triceps::Label");
@@ -1094,11 +1094,11 @@ sub tryMissingOptValue # (optName)
 }
 
 &tryMissingOptValue("name");
-ok($@ =~ /^Option 'name' must be specified for class 'Triceps::JoinTwo'/);
+ok($@, qr/^Option 'name' must be specified for class 'Triceps::JoinTwo'/);
 &tryMissingOptValue("leftTable");
-ok($@ =~ /^Option 'leftTable' must be specified for class 'Triceps::JoinTwo'/);
+ok($@, qr/^Option 'leftTable' must be specified for class 'Triceps::JoinTwo'/);
 &tryMissingOptValue("rightTable");
-ok($@ =~ /^Option 'rightTable' must be specified for class 'Triceps::JoinTwo'/);
+ok($@, qr/^Option 'rightTable' must be specified for class 'Triceps::JoinTwo'/);
 
 sub tryBadOptValue # (optName, optValue, ...)
 {
@@ -1123,29 +1123,29 @@ sub tryBadOptValue # (optName, optValue, ...)
 }
 
 &tryBadOptValue(leftTable => 9);
-ok($@ =~ /^Option 'leftTable' of class 'Triceps::JoinTwo' must be a reference to 'Triceps::Table', is ''/);
+ok($@, qr/^Option 'leftTable' of class 'Triceps::JoinTwo' must be a reference to 'Triceps::Table', is ''/);
 &tryBadOptValue(rightTable => 9);
-ok($@ =~ /^Option 'rightTable' of class 'Triceps::JoinTwo' must be a reference to 'Triceps::Table', is ''/);
+ok($@, qr/^Option 'rightTable' of class 'Triceps::JoinTwo' must be a reference to 'Triceps::Table', is ''/);
 &tryBadOptValue(leftFromLabel => 9);
-ok($@ =~ /^Option 'leftFromLabel' of class 'Triceps::JoinTwo' must be a reference to 'Triceps::Label', is ''/);
+ok($@, qr/^Option 'leftFromLabel' of class 'Triceps::JoinTwo' must be a reference to 'Triceps::Label', is ''/);
 &tryBadOptValue(rightFromLabel => 9);
-ok($@ =~ /^Option 'rightFromLabel' of class 'Triceps::JoinTwo' must be a reference to 'Triceps::Label', is ''/);
+ok($@, qr/^Option 'rightFromLabel' of class 'Triceps::JoinTwo' must be a reference to 'Triceps::Label', is ''/);
 &tryBadOptValue(leftIdxPath => [$vu3]);
-ok($@ =~ /^Option 'leftIdxPath' of class 'Triceps::JoinTwo' must be a reference to 'ARRAY' '', is 'ARRAY' 'Triceps::Unit'/);
+ok($@, qr/^Option 'leftIdxPath' of class 'Triceps::JoinTwo' must be a reference to 'ARRAY' '', is 'ARRAY' 'Triceps::Unit'/);
 &tryBadOptValue(rightIdxPath => [$vu3]);
-ok($@ =~ /^Option 'rightIdxPath' of class 'Triceps::JoinTwo' must be a reference to 'ARRAY' '', is 'ARRAY' 'Triceps::Unit'/);
+ok($@, qr/^Option 'rightIdxPath' of class 'Triceps::JoinTwo' must be a reference to 'ARRAY' '', is 'ARRAY' 'Triceps::Unit'/);
 &tryBadOptValue(leftFields => 9);
-ok($@ =~ /^Option 'leftFields' of class 'Triceps::JoinTwo' must be a reference to 'ARRAY', is ''/);
+ok($@, qr/^Option 'leftFields' of class 'Triceps::JoinTwo' must be a reference to 'ARRAY', is ''/);
 &tryBadOptValue(rightFields => 9);
-ok($@ =~ /^Option 'rightFields' of class 'Triceps::JoinTwo' must be a reference to 'ARRAY', is ''/);
+ok($@, qr/^Option 'rightFields' of class 'Triceps::JoinTwo' must be a reference to 'ARRAY', is ''/);
 &tryBadOptValue(by => 9);
-ok($@ =~ /^Option 'by' of class 'Triceps::JoinTwo' must be a reference to 'ARRAY', is ''/);
+ok($@, qr/^Option 'by' of class 'Triceps::JoinTwo' must be a reference to 'ARRAY', is ''/);
 &tryBadOptValue(byLeft => 9);
-ok($@ =~ /^Option 'byLeft' of class 'Triceps::JoinTwo' must be a reference to 'ARRAY', is ''/);
+ok($@, qr/^Option 'byLeft' of class 'Triceps::JoinTwo' must be a reference to 'ARRAY', is ''/);
 &tryBadOptValue(leftSaveJoinerTo => 9);
-ok($@ =~ /^Option 'leftSaveJoinerTo' of class 'Triceps::JoinTwo' must be a reference to a scalar, is ''/);
+ok($@, qr/^Option 'leftSaveJoinerTo' of class 'Triceps::JoinTwo' must be a reference to a scalar, is ''/);
 &tryBadOptValue(rightSaveJoinerTo => 9);
-ok($@ =~ /^Option 'rightSaveJoinerTo' of class 'Triceps::JoinTwo' must be a reference to a scalar, is ''/);
+ok($@, qr/^Option 'rightSaveJoinerTo' of class 'Triceps::JoinTwo' must be a reference to a scalar, is ''/);
 
 &tryBadOptValue("leftIdxPath" => undef);
 ok($@, qr/^Option 'leftIdxPath' must be present if both 'by' and 'byLeft' are absent at/);
@@ -1155,30 +1155,30 @@ ok($@, qr/^Option 'rightIdxPath' must be present if both 'by' and 'byLeft' are a
 &tryBadOptValue(
 	by => [ "acctSrc", "source", "acctXtrId", "external" ],
 	byLeft => [ "acctSrc/source", "acctXtrId/external" ]);
-ok($@ =~ /^Triceps::JoinTwo::new: must have only one of options by or byLeft, got both by and byLeft/);
+ok($@, qr/^Triceps::JoinTwo::new: must have only one of options by or byLeft, got both by and byLeft/);
 
 {
 	$vu4 = Triceps::Unit->new("vu4");
 	ok(ref $vu4, "Triceps::Unit");
-	$tAccounts4 = $vu4->makeTable($ttAccounts, &Triceps::EM_CALL, "Accounts");
+	$tAccounts4 = $vu4->makeTable($ttAccounts, "Accounts");
 	ok(ref $tAccounts4, "Triceps::Table");
-	$tTrans4 = $vu4->makeTable($ttTrans3, &Triceps::EM_CALL, "Trans");
+	$tTrans4 = $vu4->makeTable($ttTrans3, "Trans");
 	ok(ref $tTrans4, "Triceps::Table");
 
 	&tryBadOptValue(rightTable => $tAccounts4);
-	ok($@ =~ /^Both tables must have the same unit, got 'vu3' and 'vu4'/);
+	ok($@, qr/^Both tables must have the same unit, got 'vu3' and 'vu4'/);
 
 	&tryBadOptValue(rightFromLabel => $tAccounts4->getOutputLabel());
-	ok($@ =~ /^The rightFromLabel unit does not match rightTable, 'vu4' vs 'vu3'/);
+	ok($@, qr/^The rightFromLabel unit does not match rightTable, 'vu4' vs 'vu3'/);
 	&tryBadOptValue(leftFromLabel => $tTrans4->getOutputLabel());
-	ok($@ =~ /^The leftFromLabel unit does not match leftTable, 'vu4' vs 'vu3'/);
+	ok($@, qr/^The leftFromLabel unit does not match leftTable, 'vu4' vs 'vu3'/);
 }
 
 &tryBadOptValue(type => "xxx");
-ok($@ =~ /^Unknown value 'xxx' of option 'type', must be one of inner|left|right|outer/);
+ok($@, qr/^Unknown value 'xxx' of option 'type', must be one of inner|left|right|outer/);
 
 &tryBadOptValue(rightFromLabel => $tTrans3->getOutputLabel());
-ok($@ =~ /^The rightFromLabel row type does not match rightTable,
+ok($@, qr/^The rightFromLabel row type does not match rightTable,
 in label:
   row {
     int32 id,
@@ -1194,7 +1194,7 @@ in table:
   }
 /);
 &tryBadOptValue(leftFromLabel => $tAccounts3->getOutputLabel());
-ok($@ =~ /^The leftFromLabel row type does not match leftTable,
+ok($@, qr/^The leftFromLabel row type does not match leftTable,
 in label:
   row {
     string source,
@@ -1211,7 +1211,7 @@ in table:
 /);
 
 &tryBadOptValue(leftIdxPath => [ "lookupIntGroup", "lookupInt" ]);
-ok($@ =~ /^Triceps::TableType::findIndexKeyPath: unable to find the index type at path 'lookupIntGroup', table type is:
+ok($@, qr/^Triceps::TableType::findIndexKeyPath: unable to find the index type at path 'lookupIntGroup', table type is:
 table \(
   row {
     int32 id,
@@ -1230,7 +1230,7 @@ table \(
 }/);
 
 &tryBadOptValue(rightIdxPath => [ "lookupIntGroup", "lookupInt" ]);
-ok($@ =~ /^Triceps::TableType::findIndexKeyPath: the index type at path 'lookupIntGroup.lookupInt' does not have a key, table type is:
+ok($@, qr/^Triceps::TableType::findIndexKeyPath: the index type at path 'lookupIntGroup.lookupInt' does not have a key, table type is:
 table \(
   row {
     string source,
@@ -1248,34 +1248,34 @@ table \(
 }/);
 
 &tryBadOptValue(rightIdxPath => ["iterateSrc"]);
-ok($@ =~ /^The count of key fields in left and right indexes doesnt match
+ok($@, qr/^The count of key fields in left and right indexes doesnt match
   left:  \(acctSrc, acctXtrId\)
   right: \(source\)/);
 &tryBadOptValue(by => [ "acctSrc", "source" ]);
-ok($@ =~ /^The count of key fields in the indexes and option 'by' does not match
+ok($@, qr/^The count of key fields in the indexes and option 'by' does not match
   left:  \(acctSrc, acctXtrId\)
   right: \(source, external\)
   by: \(acctSrc, source\)/);
 &tryBadOptValue(byLeft => [ "acctSrc/source" ]);
-ok($@ =~ /^The count of key fields in the indexes and option 'byLeft' does not match
+ok($@, qr/^The count of key fields in the indexes and option 'byLeft' does not match
   left:  \(acctSrc, acctXtrId\)
   right: \(source, external\)
   by: \(acctSrc, source\)/);
 
 &tryBadOptValue(by => [ "id", "source", "acctXtrId", "external" ]);
-ok($@ =~ /^Option 'by' contains a left-side field 'id' that is not in the index key,
+ok($@, qr/^Option 'by' contains a left-side field 'id' that is not in the index key,
   left key: \(acctSrc, acctXtrId\)
   by: \(id, source, acctXtrId, external\)/);
 &tryBadOptValue(by => [ "acctSrc", "source", "acctXtrId", "internal" ]);
-ok($@ =~ /^Option 'by' contains a right-side field 'internal' that is not in the index key,
+ok($@, qr/^Option 'by' contains a right-side field 'internal' that is not in the index key,
   right key: \(source, external\)
   by: \(acctSrc, source, acctXtrId, internal\)/);
 &tryBadOptValue(byLeft => [ "id/source", "acctXtrId/external" ]);
-ok($@ =~ /^Option 'byLeft' contains a left-side field 'id' that is not in the index key,
+ok($@, qr/^Option 'byLeft' contains a left-side field 'id' that is not in the index key,
   left key: \(acctSrc, acctXtrId\)
   by: \(id, source, acctXtrId, external\)/);
 &tryBadOptValue(byLeft => [ "acctSrc/source", "acctXtrId/internal" ]);
-ok($@ =~ /^Option 'byLeft' contains a right-side field 'internal' that is not in the index key,
+ok($@, qr/^Option 'byLeft' contains a right-side field 'internal' that is not in the index key,
   right key: \(source, external\)
   by: \(acctSrc, source, acctXtrId, internal\)/);
 
@@ -1321,9 +1321,9 @@ ok($@ =~ /^Option 'byLeft' contains a right-side field 'internal' that is not in
 	$res = $ttVaried->initialize();
 	ok($res, 1);
 
-	my $t1 = $vu3->makeTable($ttVaried, &Triceps::EM_CALL, "t1");
+	my $t1 = $vu3->makeTable($ttVaried, "t1");
 	ok(ref $t1, "Triceps::Table");
-	my $t2 = $vu3->makeTable($ttVaried, &Triceps::EM_CALL, "t2");
+	my $t2 = $vu3->makeTable($ttVaried, "t2");
 	ok(ref $t2, "Triceps::Table");
 
 	&tryBadOptValue(
@@ -1332,7 +1332,7 @@ ok($@ =~ /^Option 'byLeft' contains a right-side field 'internal' that is not in
 		rightTable => $t2,
 		rightIdxPath => [ "b" ],
 	);
-	ok($@ =~ /^Mismatched field types in the join condition: left a uint8, right b int32/);
+	ok($@, qr/^Mismatched field types in the join condition: left a uint8, right b int32/);
 
 	&tryBadOptValue(
 		leftTable => $t1,
@@ -1340,7 +1340,7 @@ ok($@ =~ /^Option 'byLeft' contains a right-side field 'internal' that is not in
 		rightTable => $t2,
 		rightIdxPath => [ "b" ],
 	);
-	ok($@ =~ /^Mismatched field types in the join condition: left c int64, right b int32/);
+	ok($@, qr/^Mismatched field types in the join condition: left c int64, right b int32/);
 
 	&tryBadOptValue(
 		leftTable => $t1,
@@ -1348,7 +1348,7 @@ ok($@ =~ /^Option 'byLeft' contains a right-side field 'internal' that is not in
 		rightTable => $t2,
 		rightIdxPath => [ "b" ],
 	);
-	ok($@ =~ /^Mismatched field types in the join condition: left bb int32\[\], right b int32/);
+	ok($@, qr/^Mismatched field types in the join condition: left bb int32\[\], right b int32/);
 
 	&tryBadOptValue(
 		leftTable => $t1,
@@ -1357,7 +1357,7 @@ ok($@ =~ /^Option 'byLeft' contains a right-side field 'internal' that is not in
 		rightIdxPath => [ "b" ],
 		overrideKeyTypes => 1,
 	);
-	ok($@ =~ /^Mismatched array and scalar fields in the join condition: left bb int32\[\], right b int32/);
+	ok($@, qr/^Mismatched array and scalar fields in the join condition: left bb int32\[\], right b int32/);
 
 	&tryBadOptValue(
 		leftTable => $t1,
@@ -1365,7 +1365,7 @@ ok($@ =~ /^Option 'byLeft' contains a right-side field 'internal' that is not in
 		rightTable => $t2,
 		rightIdxPath => [ "aa" ],
 	);
-	ok($@ =~ /^Mismatched field types in the join condition: left a uint8, right aa uint8\[\]/);
+	ok($@, qr/^Mismatched field types in the join condition: left a uint8, right aa uint8\[\]/);
 
 	&tryBadOptValue(
 		leftTable => $t1,
@@ -1373,7 +1373,7 @@ ok($@ =~ /^Option 'byLeft' contains a right-side field 'internal' that is not in
 		rightTable => $t2,
 		rightIdxPath => [ "aa" ],
 	);
-	ok($@ =~ /^Mismatched field types in the join condition: left e string, right aa uint8\[\]/);
+	ok($@, qr/^Mismatched field types in the join condition: left e string, right aa uint8\[\]/);
 
 	# now test the good ones
 	my $join;
@@ -1413,7 +1413,7 @@ ok($@ =~ /^Option 'byLeft' contains a right-side field 'internal' that is not in
 }
 
 &tryBadOptValue(fieldsUniqKey => "xxx");
-ok($@ =~ /^Unknown value 'xxx' of option 'fieldsUniqKey', must be one of none|manual|left|right|first/);
+ok($@, qr/^Unknown value 'xxx' of option 'fieldsUniqKey', must be one of none|manual|left|right|first/);
 #print STDERR "$@\n";
 
 #########

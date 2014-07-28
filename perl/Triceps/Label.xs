@@ -1,5 +1,5 @@
 //
-// (C) Copyright 2011-2013 Sergey A. Babkin.
+// (C) Copyright 2011-2014 Sergey A. Babkin.
 // This file is a part of Triceps.
 // See the file COPYRIGHT for the copyright notice and license information
 //
@@ -206,18 +206,13 @@ makeRowop(WrapLabel *self, SV *opcode, WrapRow *row, ...)
 				);
 			}
 
-			Rowop::Opcode op;
-			if (!parseOpcode(funcName, opcode, op))
-				break; // sets the error in the function
+			Rowop::Opcode op = parseOpcode(funcName, opcode); // may throw
 
 			Autoref<Rowop> rop;
 			if (items == 3) {
 				rop = new Rowop(lab, op, r);
 			} else if (items == 4) {
-				Gadget::EnqMode em;
-				if (!parseEnqMode(funcName, ST(3), em))
-					break; // sets the error in the function
-
+				Gadget::EnqMode em = parseEnqMode(funcName, ST(3)); // may throw
 				rop = new Rowop(lab, op, r, em);
 			} else {
 				throw Exception::f("Usage: %s(label, opcode, row [, enqMode]), received too many arguments", funcName);

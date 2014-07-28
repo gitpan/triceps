@@ -1,5 +1,5 @@
 #
-# (C) Copyright 2011-2013 Sergey A. Babkin.
+# (C) Copyright 2011-2014 Sergey A. Babkin.
 # This file is a part of Triceps.
 # See the file COPYRIGHT for the copyright notice and license information
 #
@@ -17,7 +17,7 @@ use strict;
 use threads;
 
 use Test;
-BEGIN { plan tests => 250 };
+BEGIN { plan tests => 253 };
 use Triceps;
 use Carp;
 # for the file interruption test
@@ -321,8 +321,7 @@ sub badFacet # (trieadOwner, optName, optValue, ...)
 	my $tt = Triceps::TableType->new($rt1)
 		->addSubIndex("by_b", 
 			Triceps::IndexType->newHashed(key => [ "b" ])
-		)
-	or confess "$!";
+		);
 
 	my $fa;
 	my $fret;
@@ -408,6 +407,11 @@ sub badFacet # (trieadOwner, optName, optValue, ...)
 	ok(ref $exp[1], "Triceps::Nexus");
 	ok($exp[1]->getName(), "nx1");
 	ok($fa->nexus()->same($exp[1]));
+
+	# test the Nexus methods
+	ok($exp[1]->getTrieadName(), "t1");
+	ok($exp[1]->isReverse(), 0);
+	ok($exp[1]->queueLimit(), 100);
 
 	@exp = $t1->imports();
 	ok($#exp, 1);

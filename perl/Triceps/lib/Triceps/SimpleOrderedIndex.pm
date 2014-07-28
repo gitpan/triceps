@@ -1,5 +1,5 @@
 #
-# (C) Copyright 2011-2013 Sergey A. Babkin.
+# (C) Copyright 2011-2014 Sergey A. Babkin.
 # This file is a part of Triceps.
 # See the file COPYRIGHT for the copyright notice and license information
 #
@@ -9,7 +9,7 @@ package Triceps::SimpleOrderedIndex;
 
 sub CLONE_SKIP { 1; }
 
-our $VERSION = 'v1.0.93';
+our $VERSION = 'v2.0.0';
 
 use Carp;
 
@@ -33,7 +33,7 @@ sub new # ($class, $fieldName => $direction...)
 
 	$self = Triceps::IndexType->newPerlSorted(
 		$sortName, '&Triceps::SimpleOrderedIndex::init(@_)', undef, @args
-	) or confess "$!";
+	);
 	bless $self, $class;
 	return $self;
 }
@@ -95,9 +95,7 @@ sub init # ($tabt, $idxt, $rowt, @args)
 	} else {
 		# set the comparison as source code
 		#print STDERR "DEBUG Triceps::SimpleOrderedIndex::init: comparison function:\n$compare\n";
-		$idxt->setComparator($compare)
-			or return "Triceps::SimpleOrderedIndex::init: can not set the compare function:\n"
-			. "$!\n";
+		$idxt->setComparator($compare);
 	}
 	return $errors;
 }

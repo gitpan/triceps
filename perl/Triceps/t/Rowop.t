@@ -1,5 +1,5 @@
 #
-# (C) Copyright 2011-2013 Sergey A. Babkin.
+# (C) Copyright 2011-2014 Sergey A. Babkin.
 # This file is a part of Triceps.
 # See the file COPYRIGHT for the copyright notice and license information
 #
@@ -82,9 +82,8 @@ ok(ref $tt1, "Triceps::TableType");
 
 $res = $tt1->initialize();
 ok($res, 1);
-#print STDERR "$!" . "\n";
 
-$t1 = $u1->makeTable($tt1, "EM_SCHEDULE", "tab1");
+$t1 = $u1->makeTable($tt1, "tab1");
 ok(ref $t1, "Triceps::Table");
 
 $lb = $t1->getInputLabel();

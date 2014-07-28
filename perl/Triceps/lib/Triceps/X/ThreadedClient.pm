@@ -1,5 +1,5 @@
 #
-# (C) Copyright 2011-2013 Sergey A. Babkin.
+# (C) Copyright 2011-2014 Sergey A. Babkin.
 # This file is a part of Triceps.
 # See the file COPYRIGHT for the copyright notice and license information
 #
@@ -17,7 +17,7 @@ package Triceps::X::ThreadedClient;
 
 sub CLONE_SKIP { 1; }
 
-our $VERSION = 'v1.0.93';
+our $VERSION = 'v2.0.0';
 
 use Carp;
 use IO::Socket;
@@ -68,14 +68,14 @@ sub collectorT # (@opts)
 	my $rtMsg = Triceps::RowType->new(
 		client => "string", # client name
 		text => "string", # text of the message
-	) or confess "$!";
+	);
 
 	# a control message from the global thread
 	my $rtCtl = Triceps::RowType->new(
 		cmd => "string", # the command to execute
 		client => "string", # client on which the command applies
 		arg => "string", # the command argument
-	) or confess "$!";
+	);
 
 	my $faSend = $owner->makeNexus( # messages to be sent to the client writers
 		name => "send",
@@ -220,7 +220,7 @@ sub clientSendT # (@opts)
 	my $owner = $opts->{owner};
 	my $app = $owner->app();
 	my $unit = $owner->unit();
-	my ($tsock, $sock) = $owner->trackDupSocket($opts->{client}, ">");
+	my ($tsock, $sock) = $owner->trackDupFile($opts->{client}, ">");
 
 	my $faSend = $owner->importNexus(
 		from => "collector/send",
@@ -284,7 +284,7 @@ sub clientRecvT # (@opts)
 	my $owner = $opts->{owner};
 	my $app = $owner->app();
 	my $unit = $owner->unit();
-	my ($tsock, $sock) = $owner->trackDupSocket($opts->{client}, "<");
+	my ($tsock, $sock) = $owner->trackDupFile($opts->{client}, "<");
 
 	my $faRecv = $owner->importNexus(
 		from => "collector/receive",

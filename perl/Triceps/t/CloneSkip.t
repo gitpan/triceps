@@ -1,5 +1,5 @@
 #
-# (C) Copyright 2011-2013 Sergey A. Babkin.
+# (C) Copyright 2011-2014 Sergey A. Babkin.
 # This file is a part of Triceps.
 # See the file COPYRIGHT for the copyright notice and license information
 #
@@ -86,10 +86,10 @@ my $tt1 = Triceps::TableType->new($rt1)
 ok(ref $tt1, "Triceps::TableType");
 ok($tt1->initialize(), 1);
 
-my $t1 = $u1->makeTable($tt1, "EM_CALL", "t1");
+my $t1 = $u1->makeTable($tt1, "t1");
 ok(ref $t1, "Triceps::Table");
 
-my $t2 = $u1->makeTable($tt1, "EM_CALL", "t2"); # for joins
+my $t2 = $u1->makeTable($tt1, "t2"); # for joins
 ok(ref $t2, "Triceps::Table");
 
 my $lb1 = $t1->getOutputLabel();

@@ -1,5 +1,5 @@
 #
-# (C) Copyright 2011-2013 Sergey A. Babkin.
+# (C) Copyright 2011-2014 Sergey A. Babkin.
 # This file is a part of Triceps.
 # See the file COPYRIGHT for the copyright notice and license information
 #
@@ -14,7 +14,7 @@
 use ExtUtils::testlib;
 
 use Test;
-BEGIN { plan tests => 16 };
+BEGIN { plan tests => 17 };
 use strict;
 use Triceps;
 use Triceps::X::TestFeed qw(:all);
@@ -40,19 +40,19 @@ sub listenerT
 	undef @_;
 	my $owner = $opts->{owner};
 
-	my ($tsock, $sock) = $owner->trackGetSocket($opts->{socketName}, "+<");
+	my ($tsock, $sock) = $owner->trackGetFile($opts->{socketName}, "+<");
 
 	# a chat text message
 	my $rtMsg = Triceps::RowType->new(
 		topic => "string",
 		msg => "string",
-	) or confess "$!";
+	);
 
 	# a control message between the reader and writer threads
 	my $rtCtl = Triceps::RowType->new(
 		cmd => "string", # the command to execute
 		arg => "string", # the command argument
-	) or confess "$!";
+	);
 
 	$owner->makeNexus(
 		name => "chat",
@@ -90,7 +90,7 @@ sub chatSockReadT
 	my $tname = $opts->{thread};
 
 	# only dup the socket, the writer thread will consume it
-	my ($tsock, $sock) = $owner->trackDupSocket($opts->{socketName}, "<");
+	my ($tsock, $sock) = $owner->trackDupFile($opts->{socketName}, "<");
 
 	# user messages will be sent here
 	my $faChat = $owner->importNexus(
@@ -124,7 +124,8 @@ sub chatSockReadT
 	my $lbChat = $faChat->getLabel("msg");
 	my $lbCtl = $faCtl->getLabel("ctl");
 
-	$unit->makeHashCall($lbCtl, "OP_INSERT", cmd => "print", arg => "!ready," . $opts->{fragment});
+	$unit->makeHashCall($lbCtl, "OP_INSERT", 
+		cmd => "print", arg => "!ready," . $opts->{fragment});
 	$owner->flushWriters();
 
 	while(<$sock>) {
@@ -142,6 +143,12 @@ sub chatSockReadT
 			$unit->makeHashCall($lbChat, "OP_INSERT", topic => "*", msg => "server shutting down");
 			$owner->flushWriters();
 			Triceps::AutoDrain::makeShared($owner);
+			eval {$app->shutdown();};
+		} elsif ($data[0] eq "shutdown2") { # with the guarantee of the last word
+			my $drain = Triceps::AutoDrain::makeExclusive($owner);
+			$unit->makeHashCall($lbChat, "OP_INSERT", topic => "*", msg => "server shutting down");
+			$owner->flushWriters();
+			$drain->wait();
 			eval {$app->shutdown();};
 		} elsif ($data[0] eq "publish") {
 			$unit->makeHashCall($lbChat, "OP_INSERT", topic => $data[1], msg => $data[2]);
@@ -184,7 +191,7 @@ sub chatSockWriteT
 	my $app = $owner->app();
 	my $tname = $opts->{thread};
 
-	my ($tsock, $sock) = $owner->trackGetSocket($opts->{socketName}, ">");
+	my ($tsock, $sock) = $owner->trackGetFile($opts->{socketName}, ">");
 
 	my $faChat = $owner->importNexus(
 		from => "global/chat",
@@ -443,6 +450,61 @@ c1|__EOF__
 }
 
 ######################
+# Test of shutdown2
+
+{
+	my ($port, $pid) = Triceps::X::ThreadedServer::startServer(
+			app => "chat",
+			main => \&listenerT,
+			port => 0,
+			fork => 1,
+	);
+
+	Triceps::App::build "client", sub {
+		my $appname = $Triceps::App::name;
+		my $owner = $Triceps::App::global;
+
+		my $client = Triceps::X::ThreadedClient->new(
+			owner => $owner,
+			port => $port,
+			totalTimeout => 5,
+			debug => 0,
+		);
+
+		$owner->readyReady();
+
+		$client->startClient("c1");
+		$client->expect("c1", '!ready');
+
+		$client->startClient("c2");
+		$client->expect("c2", '!ready');
+
+		$client->send("c1", "shutdown2\n");
+		$client->expect("c1", '__EOF__');
+		$client->expect("c2", '__EOF__');
+
+		ok($client->getTrace(),
+'> connect c1
+c1|!ready,cliconn1
+> connect c2
+c2|!ready,cliconn2
+> c1|shutdown2
+c1|*,server shutting down
+c1|__EOF__
+c2|*,server shutting down
+c2|__EOF__
+');
+		if ($@) {
+			kill 9, $pid;
+			die $@;
+		}
+
+	};
+
+	waitpid($pid, 0);
+}
+
+######################
 # Tests of ThreadedClient (conveniently using the chat server as a dummy).
 
 # test of the client unexpectedly closing the socket
@@ -471,13 +533,13 @@ c1|__EOF__
 
 		$client->send("c1", "shutdown\n");
 		$client->expect("c1", 'zzz'); # will die here on an unexpected EOF
-		ok($@, "Unexpected EOF when expecting (?m-xis:zzz)");
+		ok($@, qr/^Unexpected EOF when expecting .*:zzz/);
 		ok($client->getTrace(),
-'> connect c1
+qr/^> connect c1
 c1|!ready,cliconn1
 > c1|shutdown
-c1|Unexpected EOF when expecting (?m-xis:zzz)
-');
+c1|Unexpected EOF when expecting .*:zzz\)
+/);
 	};
 
 	$thread->join();
@@ -506,21 +568,21 @@ c1|Unexpected EOF when expecting (?m-xis:zzz)
 
 		$client->startClient("c1", $port);
 		$client->expect("c1", 'zzz', 0.1);
-		ok($@, "Timed out when expecting (?m-xis:zzz)");
+		ok($@, qr/^Timed out when expecting \(.*:zzz\)/);
 		$client->send("c1", "shutdown\n");
 		$client->expect("c1", '__EOF__'); # makes sure of flusing the socket
 
 		ok($client->getTrace(),
-'> connect c1
-c1|Timed out when expecting (?m-xis:zzz)
+qr/^> connect c1
+c1|Timed out when expecting \(.*:zzz\)
 > c1|shutdown
 c1|!ready,cliconn1
-c1|*,server shutting down
+c1|\*,server shutting down
 c1|__EOF__
-');
+/);
 		ok($client->getErrorTrace(),
-'c1|Timed out when expecting (?m-xis:zzz)
-');
+qr/^c1|Timed out when expecting \(.*:zzz\)
+/);
 	};
 
 	$thread->join();
@@ -550,21 +612,21 @@ c1|__EOF__
 
 		$client->startClient("c1", $port);
 		$client->expect("c1", 'zzz');
-		ok($@, "Timed out when expecting (?m-xis:zzz)");
+		ok($@, qr/^Timed out when expecting \(.*:zzz\)/);
 		$client->send("c1", "shutdown\n");
 		$client->expect("c1", '__EOF__', 0); # 0 disables the timeout
 
 		ok($client->getTrace(),
-'> connect c1
-c1|Timed out when expecting (?m-xis:zzz)
+qr/^> connect c1
+c1|Timed out when expecting \(.*:zzz\)
 > c1|shutdown
 c1|!ready,cliconn1
-c1|*,server shutting down
+c1|\*,server shutting down
 c1|__EOF__
-');
+/);
 		ok($client->getErrorTrace(),
-'c1|Timed out when expecting (?m-xis:zzz)
-');
+qr/^c1|Timed out when expecting \(.*:zzz\)
+/);
 	};
 
 	$thread->join();
@@ -594,25 +656,25 @@ c1|__EOF__
 
 		$client->startClient("c1", $port);
 		$client->expect("c1", 'zzz');
-		ok($@, "Timed out when expecting (?m-xis:zzz)");
+		ok($@, qr/^Timed out when expecting \(.*:zzz\)/);
 		$client->expect("c1", 'yyy');
-		ok($@, "Timed out when expecting (?m-xis:yyy)");
+		ok($@, qr/^Timed out when expecting \(.*:yyy\)/);
 		$client->send("c1", "shutdown\n");
 		$client->expect("c1", '__EOF__', 0); # 0 disables the timeout
 
 		ok($client->getTrace(),
-'> connect c1
-c1|Timed out when expecting (?m-xis:zzz)
-c1|Timed out when expecting (?m-xis:yyy)
+qr/^> connect c1
+c1|Timed out when expecting \(.*:zzz\)
+c1|Timed out when expecting \(.*:yyy\)
 > c1|shutdown
 c1|!ready,cliconn1
-c1|*,server shutting down
+c1|\*,server shutting down
 c1|__EOF__
-');
+/);
 		ok($client->getErrorTrace(),
-'c1|Timed out when expecting (?m-xis:zzz)
-c1|Timed out when expecting (?m-xis:yyy)
-');
+qr/^c1|Timed out when expecting \(.*:zzz\)
+c1|Timed out when expecting \(.*:yyy\)
+/);
 	};
 
 	$thread->join();

@@ -1,5 +1,5 @@
 //
-// (C) Copyright 2011-2013 Sergey A. Babkin.
+// (C) Copyright 2011-2014 Sergey A. Babkin.
 // This file is a part of Triceps.
 // See the file COPYRIGHT for the copyright notice and license information
 //
@@ -35,6 +35,7 @@ void BasicPthread::start(Autoref<TrieadOwner> to)
 void BasicPthread::startL(Autoref<App> app, Autoref<TrieadOwner> to)
 {
 	to_ = to;
+	to->fileInterrupt_ = fileInterrupt();
 	selfref_ = this; // will be reset to NULL in run_it
 	int err = pthread_create(&id_, NULL, run_it, (void *)this); // sets id_
 	if (err != 0) {

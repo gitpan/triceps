@@ -7,7 +7,7 @@
 ]>
 
 <!--
-(C) Copyright 2011-2013 Sergey A. Babkin.
+(C) Copyright 2011-2014 Sergey A. Babkin.
 This file is a part of Triceps.
 See the file COPYRIGHT for the copyright notice and license information
 -->
@@ -114,6 +114,9 @@ See the file COPYRIGHT for the copyright notice and license information
 			<primary>label</primary>
 			<secondary>chaining</secondary>
 		</indexterm>
+		<indexterm>
+			<primary>DummyLabel</primary>
+		</indexterm>
 		<para>
 		A Triceps model contains the straightforward code and the mode complex
 		stateful elements, such as tables, aggregators, joiners (which may be
@@ -161,7 +164,7 @@ See the file COPYRIGHT for the copyright notice and license information
 			<secondary>dummy</secondary>
 		</indexterm>
 <pre>
-$label = $unit->makeDummyLabel($rowType, "name") or confess "$!";
+$label = $unit->makeDummyLabel($rowType, "name");
 </pre>
 
 		<para>
@@ -179,19 +182,22 @@ $label = $unit->makeDummyLabel($rowType, "name") or confess "$!";
 			<secondary>Perl</secondary>
 		</indexterm>
 <pre>
-$label = $unit->makeLabel($rowType, "name", \&clearSub,
-	\&execSub, @args);
+$label = $unit->makeLabel($rowType, "name", $clearSub,
+	$execSub, @args);
 </pre>
 
 		<para>
 		The row type and name arguments are the same as for the dummy label.
-		The following arguments provide the references to the Perl functions
-		that perform the actions. <pre>execSub</pre> is the function that executes to
+		The following two arguments provide the references to the Perl functions
+		that perform the actions. 
+		They can be specified as a function reference or a source code string, see
+		<xref linkend="sc_code" xrefstyle="select: label quotedtitle pageabbrev"/>&xrsp;. 
+		<pre>$execSub</pre> is the function that executes to
 		handle the incoming rows. It gets the arguments:
 		</para>
 
 <pre>
-execSub($label, $rowop, @args)
+&$execSub($label, $rowop, @args)
 </pre>
 
 		<para>
@@ -212,13 +218,13 @@ execSub($label, $rowop, @args)
 		</para>
 
 		<para>
-		<pre>clearSub</pre> is the function that clears the label. It will be explained in the
+		<pre>$clearSub</pre> is the function that clears the label. It will be explained in the
 		<xref linkend="sc_memory_labels" xrefstyle="select: label quotedtitle pageabbrev"/>&xrsp;.
-		Either of <pre>execSub</pre> and <pre>clearSub</pre> can be specified as <pre>undef</pre>. Though
-		a label with an undefined <pre>execSub</pre> makes the label useless for anything
+		Either of <pre>$execSub</pre> and <pre>$clearSub</pre> can be specified as <pre>undef</pre>. Though
+		a label with an undefined <pre>$execSub</pre> makes the label useless for anything
 		other than clearing. On an attempt to send data to it, it will complain that
 		the label has been cleared.
-		The undefined <pre>clearSub</pre> causes the function
+		The undefined <pre>$clearSub</pre> causes the function
 		<pre>Triceps::clearArgs()</pre> to be used as the default, which provides the
 		correct reaction for most situations.
 		</para>
@@ -249,11 +255,11 @@ $lb = $unit->makeClearingLabel("name", @args);
 		<title>Other label methods</title>
 
 		<para>
-		The chaining of labels is done with the call:
+		The chaining of labels is done with the method:
 		</para>
 
 <pre>
-$label1->chain($label2) or confess "$!";
+$label1->chain($label2);
 </pre>
 
 		<para>
@@ -262,6 +268,26 @@ $label1->chain($label2) or confess "$!";
 		other intermediate labels. The row types of the chained labels must be equal
 		(this is more strict than for queueing up the row operations for labels,
 		and might change one or the other way in the future).
+		</para>
+
+		<para>
+		When <pre>$label1</pre> executes, its chained labels will normally
+		be executed in the order they were chained. However sometines it's
+		necessary to add a label to the chain later but have it called
+		first. This is done with the method:
+		</para>
+
+<pre>
+$label1->chainFront($label2);
+</pre>
+
+		<para>
+		It chains <pre>$label2</pre> at the start of the chain. Of course,
+		if more labels will be chained at the front afterwards, <pre>$label2</pre>
+		will be called only after them. But usually there is a need for only
+		one such label, and it's usually connected to the FnReturn and Facet
+		objects. For an example, see
+		<xref linkend="sc_mt_pipeline" xrefstyle="select: label quotedtitle pageabbrev"/>&xrsp;.
 		</para>
 
 		<para>
@@ -301,6 +327,24 @@ if ($#chain >= 0) { ... }
 		</para>
 
 		<para>
+		There is also a convenience method that
+		creates a new label by chaining it from an existing label:
+		</para>
+
+<pre>
+$label2 = $label1->makeChained($name, $subClear, $subExec, @args);
+</pre>
+
+		<para>
+		The arguments are very much the same as in <pre>Unit::makeLabel()</pre>, only there is
+		no need to specify the row type for the new label (nor obviously the
+		Unit), these are taken from the original label. It's really a wrapper
+		that finds the unit and row type from <pre>label1</pre>, makes a new
+		label, and then chains it off <pre>label1</pre>.
+		</para>
+
+
+		<para>
 		The whole label can be cleared with
 		</para>
 
@@ -313,7 +357,12 @@ $label->clear();
 		the labels: it calls the clear function (if any) and clears the
 		chainings. Note that the labels that used to be chained from this one
 		do not get cleared themselves, they're only unchained from this one.
+		To check whether the label has been already cleared use:
 		</para>
+
+<pre>
+$result = $label->isCleared();
+</pre>
 
 		<para>
 		Labels have the usual way of comparing the references:
@@ -372,7 +421,7 @@ $execSubRef = $label->getCode();
 		They can be constructed from Perl, and really only from Perl. The &Cpp;
 		code can access and control them, in a symmetrical relation. The
 		method <pre>getCode()</pre> has meaning only on these Perl labels.
-		Finally, the clearing labels also get dreated from Perl, and fundamentally
+		Finally, the clearing labels also get created from Perl, and fundamentally
 		are Perl labels with many settings hardcoded in the constructor.
 		<pre>getCode()</pre> can be used on them too but since they have
 		no handler code, it would always return <pre>undef</pre>.
@@ -395,6 +444,18 @@ $label->setName($name);
 		The label also provides the constructor methods for the row operations, 
 		which are described below.
 		</para>
+
+		<para>
+		And for completeness I'll mention the methods used to mark the
+		label as non-reentrant and to read this mark back. They will be described
+		in detail in 
+		<xref linkend="sc_sched_recursion" xrefstyle="select: label quotedtitle pageabbrev"/>&xrsp;.
+		</para>
+<pre>
+$label->setNonReentrant();
+$val = $label->isNonReentrant();
+</pre>
+
 	</sect1>
 
 	<sect1 id="sc_Rowop">
@@ -464,9 +525,7 @@ $rowop = $label->makeRowopArray($opcode, @fields);
 		Note that they don't need the row type argument any more,
 		because the label knows the row type and provides it.
 		Internally these methods are currently implemented in Perl, and just wrap
-		the two calls into one. They also use the new error handling
-		convention, and confess on any errors. There is normally no
-		need to check their result. In the future they will be rewritten
+		the two calls into one.  In the future they will be rewritten
 		in &Cpp; for greater efficiency.
 		</para>
 
@@ -516,7 +575,7 @@ my $lab1 = $unit->makeLabel($rt1, "lab1", undef, sub {
 	if ($rowop->getRow()->get("a") > 10) {
 		$unit->call($lab2->adopt($rowop));
 	}
-}) or confess "$!";
+});
 </pre>
 
 		<para>
@@ -563,11 +622,12 @@ $row = $rowop->getRow();
 
 <pre>
 $string = $rowop->printP();
+$string = $rowop->printP($name);
 </pre>
 
 		<para>
 		Just as with a row, the method <pre>printP()</pre> is implemented in Perl. In
-		the future a <pre>print()</pre> done right in C++ may be added, but for now I try
+		the future a <pre>print()</pre> done right in &Cpp; may be added, but for now I try
 		to keep all the interpretation of the data on the Perl side. Even though
 		<pre>printP()</pre> is implemented in Perl, it can print the rowops
 		for any kinds of labels.  The
@@ -592,6 +652,34 @@ lb OP_INSERT a="123" b="456" c="3000000000000000" d="3.14" e="text"
 		<para>
 		The row contents is printed through <pre>Row::printP()</pre>, so it has
 		the same format.
+		</para>
+
+		<para>
+		The optional argument allows to override the name of the label
+		printed. For example, if in the example above the last line were
+		to be replaced with
+		</para>
+
+<pre>
+print $rowop->printP("OtherLabel"), "\n";
+</pre>
+
+		<para>
+		the result will become:
+		</para>
+
+<pre>
+OtherLabel OP_INSERT a="123" b="456" c="3000000000000000" d="3.14" e="text" 
+</pre>
+
+		<para>
+		It makes the printing of rowops in the chained
+		labels more convenient. A chained label's execution handler receives
+		the original unchanged rowop that refers to the first label in the
+		chain. So when it gets printed, it will print the name of the first
+		label in the chain, which might be very surprising. The explicit
+		argument allows to override it to the name of the chained label (or to
+		any other value).
 		</para>
 	</sect1>
 
@@ -734,6 +822,7 @@ Triceps::isDelete($rowop->getOpcode())
 		They handle the whole logic directly in &Cpp; without an extra
 		Perl conversion of the values.
 		</para>
+
 	</sect1>
 
 </chapter>

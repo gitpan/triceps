@@ -1,5 +1,5 @@
 #
-# (C) Copyright 2011-2013 Sergey A. Babkin.
+# (C) Copyright 2011-2014 Sergey A. Babkin.
 # This file is a part of Triceps.
 # See the file COPYRIGHT for the copyright notice and license information
 #
@@ -7,7 +7,7 @@
 
 package Triceps::AggregatorContext;
 
-our $VERSION = 'v1.0.93';
+our $VERSION = 'v2.0.0';
 
 use Carp;
 
@@ -20,7 +20,7 @@ sub makeHashSend # (self, opcode, fieldName => fieldValue, ...)
 {
 	my $self = shift;
 	my $opcode = shift;
-	my $row = $self->resultType()->makeRowHash(@_) or confess "$!";
+	my $row = $self->resultType()->makeRowHash(@_);
 	my $res = $self->send($opcode, $row);
 	return $res;
 }
@@ -34,7 +34,7 @@ sub makeArraySend # (self, opcode, fieldValue, ...)
 {
 	my $self = shift;
 	my $opcode = shift;
-	my $row = $self->resultType()->makeRowArray(@_) or confess "$!";
+	my $row = $self->resultType()->makeRowArray(@_);
 	my $res = $self->send($opcode, $row);
 	return $res;
 }

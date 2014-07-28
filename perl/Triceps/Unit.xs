@@ -1,5 +1,5 @@
 //
-// (C) Copyright 2011-2013 Sergey A. Babkin.
+// (C) Copyright 2011-2014 Sergey A. Babkin.
 // This file is a part of Triceps.
 // See the file COPYRIGHT for the copyright notice and license information
 //
@@ -55,10 +55,8 @@ schedule(WrapUnit *self, ...)
 			static char funcName[] =  "Triceps::Unit::schedule";
 			clearErrMsg();
 			Unit *u = self->get();
-			for (int i = 1; i < items; i++) {
-				if (!enqueueSv(funcName, u, NULL, Gadget::EM_SCHEDULE, ST(i), i))
-					break; // XXX will croak based on setErrMsg()
-			}
+			for (int i = 1; i < items; i++)
+				enqueueSv(funcName, u, NULL, Gadget::EM_SCHEDULE, ST(i), i); // may throw
 		} TRICEPS_CATCH_CROAK;
 		RETVAL = 1;
 	OUTPUT:
@@ -72,10 +70,8 @@ fork(WrapUnit *self, ...)
 			static char funcName[] =  "Triceps::Unit::fork";
 			clearErrMsg();
 			Unit *u = self->get();
-			for (int i = 1; i < items; i++) {
-				if (!enqueueSv(funcName, u, NULL, Gadget::EM_FORK, ST(i), i))
-					break; // XXX will croak based on setErrMsg()
-			}
+			for (int i = 1; i < items; i++)
+				enqueueSv(funcName, u, NULL, Gadget::EM_FORK, ST(i), i); // may throw
 		} TRICEPS_CATCH_CROAK;
 		RETVAL = 1;
 	OUTPUT:
@@ -89,10 +85,8 @@ call(WrapUnit *self, ...)
 			static char funcName[] =  "Triceps::Unit::call";
 			clearErrMsg();
 			Unit *u = self->get();
-			for (int i = 1; i < items; i++) {
-				if (!enqueueSv(funcName, u, NULL, Gadget::EM_CALL, ST(i), i)) 
-					break; // XXX will croak based on setErrMsg()
-			}
+			for (int i = 1; i < items; i++)
+				enqueueSv(funcName, u, NULL, Gadget::EM_CALL, ST(i), i); // may throw
 		} TRICEPS_CATCH_CROAK;
 		RETVAL = 1;
 	OUTPUT:
@@ -106,14 +100,10 @@ enqueue(WrapUnit *self, SV *enqMode, ...)
 			static char funcName[] =  "Triceps::Unit::enqueue";
 			clearErrMsg();
 			Unit *u = self->get();
-			Gadget::EnqMode em;
+			Gadget::EnqMode em = parseEnqMode(funcName, enqMode); // may throw
 
-			if (parseEnqMode(funcName, enqMode, em)) { // XXX otherwise will croak based on setErrMsg()
-				for (int i = 2; i < items; i++) {
-					if (!enqueueSv(funcName, u, NULL, em, ST(i), i))
-						break; // XXX will croak based on setErrMsg()
-				}
-			}
+			for (int i = 2; i < items; i++)
+				enqueueSv(funcName, u, NULL, em, ST(i), i); // may throw
 		} TRICEPS_CATCH_CROAK;
 		RETVAL = 1;
 	OUTPUT:
@@ -144,10 +134,8 @@ loopAt(WrapUnit *self, WrapFrameMark *wm, ...)
 			if (mu != NULL && mu != u) {
 				throw Exception( strprintf("%s: mark belongs to a different unit '%s'", funcName, mu->getName().c_str()), false );
 			}
-			for (int i = 2; i < items; i++) {
-				if (!enqueueSv(funcName, u, mark, Gadget::EM_FORK, ST(i), i))
-					break; // XXX will croak based on setErrMsg()
-			}
+			for (int i = 2; i < items; i++)
+				enqueueSv(funcName, u, mark, Gadget::EM_FORK, ST(i), i); // may throw
 		} TRICEPS_CATCH_CROAK;
 		RETVAL = 1;
 	OUTPUT:
@@ -177,6 +165,24 @@ empty(WrapUnit *self)
 		clearErrMsg();
 		Unit *u = self->get();
 		RETVAL = u->empty();
+	OUTPUT:
+		RETVAL
+
+int
+isFrameEmpty(WrapUnit *self)
+	CODE:
+		clearErrMsg();
+		Unit *u = self->get();
+		RETVAL = u->isFrameEmpty();
+	OUTPUT:
+		RETVAL
+
+int
+isInOuterFrame(WrapUnit *self)
+	CODE:
+		clearErrMsg();
+		Unit *u = self->get();
+		RETVAL = u->isInOuterFrame();
 	OUTPUT:
 		RETVAL
 
@@ -328,7 +334,7 @@ getTracer(WrapUnit *self)
 		Unit *u = self->get();
 		Autoref<Unit::Tracer> tracer = u->getTracer();
 		if (tracer.isNull())
-			XSRETURN_UNDEF;
+			XSRETURN_UNDEF; // not croak!
 
 		// find the class to use for blessing
 		char *CLASS = translateUnitTracerSubclass(tracer.get());
@@ -359,25 +365,23 @@ setTracer(WrapUnit *self, SV *arg)
 		} while(0); } TRICEPS_CATCH_CROAK;
 
 WrapTable *
-makeTable(WrapUnit *unit, WrapTableType *wtt, SV *enqMode, char *name)
+makeTable(WrapUnit *unit, WrapTableType *wtt, char *name)
 	CODE:
 		static char funcName[] =  "Triceps::Unit::makeTable";
 		// for casting of return value
 		static char CLASS[] = "Triceps::Table";
+		RETVAL = NULL; // shut up the warning
 
-		clearErrMsg();
-		TableType *tbt = wtt->get();
+		try { do {
+			clearErrMsg();
+			TableType *tbt = wtt->get();
 
-		Gadget::EnqMode em;
-		if (!parseEnqMode(funcName, enqMode, em))
-			XSRETURN_UNDEF;
-
-		Autoref<Table> t = tbt->makeTable(unit->get(), em, name);
-		if (t.isNull()) {
-			setErrMsg(strprintf("%s: table type was not successfully initialized", funcName));
-			XSRETURN_UNDEF;
-		}
-		RETVAL = new WrapTable(t);
+			Autoref<Table> t = tbt->makeTable(unit->get(), name);
+			if (t.isNull()) {
+				throw Exception::f("%s: table type was not successfully initialized", funcName);
+			}
+			RETVAL = new WrapTable(t);
+		} while(0); } TRICEPS_CATCH_CROAK;
 	OUTPUT:
 		RETVAL
 
@@ -391,24 +395,23 @@ makeTray(WrapUnit *self, ...)
 		clearErrMsg();
 		Unit *unit = self->get();
 
-		for (int i = 1; i < items; i++) {
-			SV *arg = ST(i);
-			if( sv_isobject(arg) && (SvTYPE(SvRV(arg)) == SVt_PVMG) ) {
-				WrapRowop *var = (WrapRowop *)SvIV((SV*)SvRV( arg ));
-				if (var == 0 || var->badMagic()) {
-					setErrMsg( strprintf("%s: argument %d has an incorrect magic for Rowop", funcName, i) );
-					XSRETURN_UNDEF;
+		try { do {
+			for (int i = 1; i < items; i++) {
+				SV *arg = ST(i);
+				if( sv_isobject(arg) && (SvTYPE(SvRV(arg)) == SVt_PVMG) ) {
+					WrapRowop *var = (WrapRowop *)SvIV((SV*)SvRV( arg ));
+					if (var == 0 || var->badMagic()) {
+						throw Exception::f("%s: argument %d has an incorrect magic for Rowop", funcName, i);
+					}
+					if (var->get()->getLabel()->getUnitPtr() != unit) {
+						throw Exception::f("%s: argument %d is a Rowop for label %s from a wrong unit %s", funcName, i,
+							var->get()->getLabel()->getName().c_str(), var->get()->getLabel()->getUnitName().c_str());
+					}
+				} else{
+					throw Exception::f("%s: argument %d is not a blessed SV reference to Rowop", funcName, i);
 				}
-				if (var->get()->getLabel()->getUnitPtr() != unit) {
-					setErrMsg( strprintf("%s: argument %d is a Rowop for label %s from a wrong unit %s", funcName, i,
-						var->get()->getLabel()->getName().c_str(), var->get()->getLabel()->getUnitName().c_str()) );
-					XSRETURN_UNDEF;
-				}
-			} else{
-				setErrMsg( strprintf("%s: argument %d is not a blessed SV reference to Rowop", funcName, i) );
-				XSRETURN_UNDEF;
 			}
-		}
+		} while(0); } TRICEPS_CATCH_CROAK;
 
 		Autoref<Tray> tray = new Tray;
 		for (int i = 1; i < items; i++) {
@@ -449,29 +452,28 @@ makeLabel(WrapUnit *self, WrapRowType *wrt, char *name, SV *clear, SV *exec, ...
 	CODE:
 		// for casting of return value
 		static char CLASS[] = "Triceps::Label";
+		RETVAL = NULL; // shut up the warning
 
-		clearErrMsg();
-		Unit *unit = self->get();
-		RowType *rt = wrt->get();
+		try { do {
+			clearErrMsg();
+			Unit *unit = self->get();
+			RowType *rt = wrt->get();
 
-		Onceref<PerlCallback> clr;
-		if (!SvOK(clear)) {
-			// take the default
-			clear = get_sv("Triceps::_DEFAULT_CLEAR_LABEL", 0);
-		}
-		if (SvOK(clear)) {
-			clr = new PerlCallback();
-			PerlCallbackInitializeSplit(clr, "Triceps::Unit::makeLabel(clear)", clear, 5, items-5);
-			if (clr->code_ == NULL)
-				XSRETURN_UNDEF; // error message is already set
-		}
+			Onceref<PerlCallback> clr;
+			if (!SvOK(clear)) {
+				// take the default
+				clear = get_sv("Triceps::_DEFAULT_CLEAR_LABEL", 0);
+			}
+			if (SvOK(clear)) {
+				clr = new PerlCallback();
+				PerlCallbackInitializeSplit(clr, "Triceps::Unit::makeLabel(clear)", clear, 5, items-5); // may throw
+			}
 
-		Onceref<PerlCallback> cb = new PerlCallback();
-		PerlCallbackInitialize(cb, "Triceps::Unit::makeLabel(callback)", 4, items-4);
-		if (cb->code_ == NULL)
-			XSRETURN_UNDEF; // error message is already set
+			Onceref<PerlCallback> cb = new PerlCallback();
+			PerlCallbackInitialize(cb, "Triceps::Unit::makeLabel(callback)", 4, items-4); // may throw
 
-		RETVAL = new WrapLabel(new PerlLabel(unit, rt, name, clr, cb));
+			RETVAL = new WrapLabel(new PerlLabel(unit, rt, name, clr, cb));
+		} while(0); } TRICEPS_CATCH_CROAK;
 	OUTPUT:
 		RETVAL
 
@@ -487,6 +489,7 @@ makeClearingLabel(WrapUnit *self, char *name, ...)
 		static char funcName[] =  "Triceps::Unit::makeClearingLabel";
 		// for casting of return value
 		static char CLASS[] = "Triceps::Label";
+		RETVAL = NULL; // shut up the warning
 
 		try { do {
 			clearErrMsg();
@@ -501,9 +504,7 @@ makeClearingLabel(WrapUnit *self, char *name, ...)
 			}
 
 			clr = new PerlCallback();
-			PerlCallbackInitializeSplit(clr, funcName, clear, 2, items-2);
-			if (clr->code_ == NULL)
-				break; // error message is already set
+			PerlCallbackInitializeSplit(clr, funcName, clear, 2, items-2); // may throw
 
 			RETVAL = new WrapLabel(new PerlLabel(unit, rt, name, clr, NULL));
 		} while(0); } TRICEPS_CATCH_CROAK;

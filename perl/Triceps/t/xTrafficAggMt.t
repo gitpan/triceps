@@ -1,5 +1,5 @@
 #
-# (C) Copyright 2011-2013 Sergey A. Babkin.
+# (C) Copyright 2011-2014 Sergey A. Babkin.
 # This file is a part of Triceps.
 # See the file COPYRIGHT for the copyright notice and license information
 #
@@ -52,15 +52,15 @@ sub readerT # (@opts)
 		local_port => "int32", 
 		remote_port => "int32",
 		bytes => "int32", # size of the packet
-	) or confess "$!";
+	);
 
 	my $rtPrint = Triceps::RowType->new(
 		text => "string", # the text to print (including \n)
-	) or confess "$!";
+	);
 
 	my $rtDumprq = Triceps::RowType->new(
 		what => "string", # identifies, what to dump
-	) or confess "$!";
+	);
 
 	my $faOut = $owner->makeNexus(
 		name => "data",
@@ -154,7 +154,7 @@ sub rawToHourlyT # (@opts)
 				)
 			)
 		)
-	or confess "$!";
+	;
 
 	# type for a periodic summary, used for hourly, daily etc. updates
 	my $rtSummary;
@@ -174,9 +174,8 @@ sub rawToHourlyT # (@opts)
 		saveRowTypeTo => \$rtSummary,
 	);
 
-	$ttPackets->initialize() or confess "$!";
-	my $tPackets = $unit->makeTable($ttPackets, 
-		&Triceps::EM_CALL, "tPackets") or confess "$!";
+	$ttPackets->initialize();
+	my $tPackets = $unit->makeTable($ttPackets, "tPackets");
 
 	# Filter the aggregator output to match the current hour.
 	my $lbHourlyFiltered = $unit->makeDummyLabel($rtSummary, "hourlyFiltered");
@@ -277,7 +276,7 @@ sub hourlyToDailyT # (@opts)
 				)
 			)
 		)
-	or confess "$!";
+	;
 
 	# type for a periodic summary, used for hourly, daily etc. updates
 	my $rtSummary;
@@ -297,9 +296,8 @@ sub hourlyToDailyT # (@opts)
 		saveRowTypeTo => \$rtSummary,
 	);
 
-	$ttHourly->initialize() or confess "$!";
-	my $tHourly = $unit->makeTable($ttHourly, 
-		&Triceps::EM_CALL, "tHourly") or confess "$!";
+	$ttHourly->initialize();
+	my $tHourly = $unit->makeTable($ttHourly, "tHourly");
 
 	# Filter the aggregator output to match the current day.
 	my $lbDailyFiltered = $unit->makeDummyLabel($rtSummary, "dailyFiltered");
@@ -378,11 +376,10 @@ sub storeDailyT # (@opts)
 				Triceps::IndexType->newHashed(key => [ "local_ip", "remote_ip" ])
 			)
 		)
-	or confess "$!";
+	;
 
-	$ttDaily->initialize() or confess "$!";
-	my $tDaily = $unit->makeTable($ttDaily, 
-		&Triceps::EM_CALL, "tDaily") or confess "$!";
+	$ttDaily->initialize();
+	my $tDaily = $unit->makeTable($ttDaily, "tDaily");
 
 	# the daily updates can be chained directly
 	$faIn->getLabel("daily")->chain($tDaily->getInputLabel());
@@ -581,7 +578,7 @@ sub readerT # (@opts)
 		local_port => "int32", 
 		remote_port => "int32",
 		bytes => "int32", # size of the packet
-	) or confess "$!";
+	);
 
 	my $rtUser = Triceps::RowType->new(
 		local_ip => "string",
@@ -606,24 +603,24 @@ sub readerT # (@opts)
 				Triceps::IndexType->newFifo()
 			)
 		)
-	or confess "$!";
+	;
 
 	# the table type for users stored by primary key
 	my $ttUsers = Triceps::TableType->new($rtUser)
 		->addSubIndex("primary", 
 			Triceps::IndexType->newHashed(key => [ "local_ip" ])
 		)
-	or confess "$!";
+	;
 
 	# table type that can be used to store the user info
 
 	my $rtPrint = Triceps::RowType->new(
 		text => "string", # the text to print (including \n)
-	) or confess "$!";
+	);
 
 	my $rtDumprq = Triceps::RowType->new(
 		what => "string", # identifies, what to dump
-	) or confess "$!";
+	);
 
 	my $faOut = $owner->makeNexus(
 		name => "data",
@@ -715,7 +712,7 @@ sub rawToHourlyT # (@opts)
 				Triceps::IndexType->newFifo()
 			)
 		)
-	or confess "$!";
+	;
 
 	# type for a periodic summary, used for hourly, daily etc. updates
 	my $rtSummary;
@@ -737,9 +734,8 @@ sub rawToHourlyT # (@opts)
 		saveRowTypeTo => \$rtSummary,
 	);
 
-	$ttPackets->initialize() or confess "$!";
-	my $tPackets = $unit->makeTable($ttPackets, 
-		&Triceps::EM_CALL, "tPackets") or confess "$!";
+	$ttPackets->initialize();
+	my $tPackets = $unit->makeTable($ttPackets, "tPackets");
 
 	# Make the table type for keeping the data after aggregation.
 	my $ttHourly = Triceps::TableType->new(
@@ -755,7 +751,7 @@ sub rawToHourlyT # (@opts)
 				remote_ip => "ASC",
 			)
 		)
-	or confess "$!";
+	;
 
 	# It's important to connect the pass-through data first,
 	# before chaining anything to the labels of the faIn, to
@@ -832,16 +828,14 @@ sub joinUsersT # (@opts)
 			)
 		)
 	;
-	$ttHourly->initialize() or confess "$!";
+	$ttHourly->initialize();
 
-	my $tHourly = $unit->makeTable($ttHourly, 
-		&Triceps::EM_CALL, "tHourly") or confess "$!";
+	my $tHourly = $unit->makeTable($ttHourly, "tHourly");
 
 	my $ttUsers = $faIn->impTableType("users");
-	$ttUsers->initialize() or confess "$!";
+	$ttUsers->initialize();
 
-	my $tUsers = $unit->makeTable($ttUsers, 
-		&Triceps::EM_CALL, "tUsers") or confess "$!";
+	my $tUsers = $unit->makeTable($ttUsers, "tUsers");
 
 	my $join = Triceps::JoinTwo->new( 
 		name => "join",

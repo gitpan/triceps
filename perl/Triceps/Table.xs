@@ -1,5 +1,5 @@
 //
-// (C) Copyright 2011-2013 Sergey A. Babkin.
+// (C) Copyright 2011-2014 Sergey A. Babkin.
 // This file is a part of Triceps.
 // See the file COPYRIGHT for the copyright notice and license information
 //
@@ -19,37 +19,33 @@ namespace TricepsPerl
 {
 
 // Parse the argument as either a RowHandle (then return it directly)
-// or a Row (then create a RowHandle from it). On errors returns NULL
-// and sets the message.
+// or a Row (then create a RowHandle from it).
+// On errors throws an Exception.
 // @patab tab - table where the handle will be used
 // @param funcName - calling function name, for error messages
 // @param arg - the incoming argument
-// @return - a RowHandle, or NULL on error; put it into Rhref because handle may be just created!!!
+// @return - a RowHandle; put it into Rhref because handle may be just created!!!
 RowHandle *parseRowOrHandle(Table *tab, const char *funcName, SV *arg)
 {
 	if( sv_isobject(arg) && (SvTYPE(SvRV(arg)) == SVt_PVMG) ) {
 		WrapRowHandle *wrh = (WrapRowHandle *)SvIV((SV*)SvRV( arg ));
 		if (wrh == 0) {
-			setErrMsg( string(funcName) + ": row argument is NULL and not a valid SV reference to Row or RowHandle" );
-			return NULL;
+			throw Exception::f("%s: row argument is NULL and not a valid SV reference to Row or RowHandle", funcName);
 		}
 		if (!wrh->badMagic()) {
 			if (wrh->ref_.getTable() != tab) {
-				setErrMsg( strprintf("%s: row argument is a RowHandle in a wrong table %s",
-					funcName, wrh->ref_.getTable()->getName().c_str()) );
-				return NULL;
+				throw Exception::f("%s: row argument is a RowHandle in a wrong table %s",
+					funcName, wrh->ref_.getTable()->getName().c_str());
 			}
 			RowHandle *rh = wrh->get();
 			if (rh == NULL) {
-				setErrMsg( strprintf("%s: RowHandle is NULL", funcName) );
-				return NULL;
+				throw Exception::f("%s: RowHandle is NULL", funcName);
 			}
 			return rh;
 		}
 		WrapRow *wr = (WrapRow *)wrh;
 		if (wr->badMagic()) {
-			setErrMsg( string(funcName) + ": row argument has an incorrect magic for Row or RowHandle" );
-			return NULL;
+			throw Exception::f("%s: row argument has an incorrect magic for Row or RowHandle", funcName);
 		}
 
 		Row *r = wr->get();
@@ -61,13 +57,11 @@ RowHandle *parseRowOrHandle(Table *tab, const char *funcName, SV *arg)
 			msg.append(", in row: ");
 			rt->printTo(msg, NOINDENT);
 
-			setErrMsg(msg);
-			return NULL;
+			throw Exception(msg, false);
 		}
 		return tab->makeRowHandle(r);
 	} else{
-		setErrMsg( string(funcName) + ": row argument is not a blessed SV reference to Row or RowHandle" );
-		return NULL;
+		throw Exception::f("%s: row argument is not a blessed SV reference to Row or RowHandle", funcName);
 	}
 }
 
@@ -153,10 +147,11 @@ getAggregatorLabel(WrapTable *self, char *aggname)
 		clearErrMsg();
 		Table *t = self->get();
 		Label *lab = t->getAggregatorLabel(aggname);
-		if (lab == NULL)  {
-			setErrMsg( strprintf("%s: aggregator '%s' is not defined on table '%s'", funcName, aggname, t->getName().c_str()) );
-			XSRETURN_UNDEF;
-		}
+
+		try { do {
+			if (lab == NULL)
+				throw Exception::f("%s: aggregator '%s' is not defined on table '%s'", funcName, aggname, t->getName().c_str());
+		} while(0); } TRICEPS_CATCH_CROAK;
 		RETVAL = new WrapLabel(lab);
 	OUTPUT:
 		RETVAL
@@ -233,6 +228,7 @@ fnReturn(WrapTable *self)
 		static char funcName[] =  "Triceps::Table::fnReturn";
 		// for casting of return value
 		static char CLASS[] = "Triceps::FnReturn";
+		RETVAL = NULL; // shut up the warning
 
 		clearErrMsg();
 		Table *t = self->get();
@@ -255,15 +251,16 @@ makeRowHandle(WrapTable *self, WrapRow *row)
 		Row *r = row->get();
 		const RowType *rt = row->ref_.getType();
 
-		if (!rt->match(t->getRowType())) {
-			string msg = strprintf("%s: table and row types are not equal, in table: ", funcName);
-			t->getRowType()->printTo(msg, NOINDENT);
-			msg.append(", in row: ");
-			rt->printTo(msg, NOINDENT);
+		try { do {
+			if (!rt->match(t->getRowType())) {
+				string msg = strprintf("%s: table and row types are not equal, in table: ", funcName);
+				t->getRowType()->printTo(msg, NOINDENT);
+				msg.append(", in row: ");
+				rt->printTo(msg, NOINDENT);
 
-			setErrMsg(msg);
-			XSRETURN_UNDEF;
-		}
+				throw Exception(msg, false);
+			}
+		} while(0); } TRICEPS_CATCH_CROAK;
 
 		RETVAL = new WrapRowHandle(t, t->makeRowHandle(r));
 	OUTPUT:
@@ -294,9 +291,7 @@ insert(WrapTable *self, SV *rowarg)
 			clearErrMsg();
 			Table *t = self->get();
 
-			Rhref rhr(t,  parseRowOrHandle(t, funcName, rowarg));
-			if (rhr.isNull()) // XXX otherwise will croak based on setErrMsg()
-				break;
+			Rhref rhr(t,  parseRowOrHandle(t, funcName, rowarg)); // may throw
 
 			RETVAL = t->insert(rhr.get());
 		} while(0); } TRICEPS_CATCH_CROAK;
@@ -315,12 +310,12 @@ remove(WrapTable *self, WrapRowHandle *wrh)
 			RowHandle *rh = wrh->get();
 
 			if (rh == NULL) {
-				throw TRICEPS_NS::Exception(strprintf("%s: RowHandle is NULL", funcName), false);
+				throw Exception::f("%s: RowHandle is NULL", funcName);
 			}
 
 			if (wrh->ref_.getTable() != t) {
-				throw TRICEPS_NS::Exception( strprintf("%s: row argument is a RowHandle in a wrong table %s",
-					funcName, wrh->ref_.getTable()->getName().c_str()), false );
+				throw Exception::f("%s: row argument is a RowHandle in a wrong table %s",
+					funcName, wrh->ref_.getTable()->getName().c_str());
 			}
 
 			t->remove(rh);
@@ -503,9 +498,7 @@ find(WrapTable *self, SV *rowarg)
 			clearErrMsg();
 			Table *t = self->get();
 
-			Rhref rhr(t,  parseRowOrHandle(t, funcName, rowarg));
-			if (rhr.isNull())
-				break;
+			Rhref rhr(t,  parseRowOrHandle(t, funcName, rowarg)); // may throw
 
 			RETVAL = new WrapRowHandle(t, t->find(rhr.get()));
 		} while(0); } TRICEPS_CATCH_CROAK;
@@ -528,9 +521,7 @@ findIdx(WrapTable *self, WrapIndexType *widx, SV *rowarg)
 				throw TRICEPS_NS::Exception(strprintf("%s: indexType argument does not belong to table's type", funcName), false);
 			}
 
-			Rhref rhr(t,  parseRowOrHandle(t, funcName, rowarg));
-			if (rhr.isNull())
-				break;
+			Rhref rhr(t,  parseRowOrHandle(t, funcName, rowarg)); // may throw
 
 			RETVAL = new WrapRowHandle(t, t->findIdx(idx, rhr.get()));
 		} while(0); } TRICEPS_CATCH_CROAK;
@@ -553,9 +544,7 @@ groupSizeIdx(WrapTable *self, WrapIndexType *widx, SV *rowarg)
 				throw TRICEPS_NS::Exception(strprintf("%s: indexType argument does not belong to table's type", funcName), false);
 			}
 
-			Rhref rhr(t,  parseRowOrHandle(t, funcName, rowarg));
-			if (rhr.isNull())
-				break;
+			Rhref rhr(t,  parseRowOrHandle(t, funcName, rowarg)); // may throw
 
 			RETVAL = t->groupSizeIdx(idx, rhr.get());
 		} while(0); } TRICEPS_CATCH_CROAK;
@@ -602,8 +591,7 @@ dumpAll(WrapTable *self, ...)
 			if (items == 1) {
 				op = Rowop::OP_INSERT;
 			} else if (items == 2) {
-				if (!parseOpcode(funcName, ST(1), op))
-					break;
+				op = parseOpcode(funcName, ST(1)); // may throw
 			} else {
 				throw TRICEPS_NS::Exception::f("Usage: %s(self [, opcode])", funcName);
 			}
@@ -628,8 +616,7 @@ dumpAllIdx(WrapTable *self, WrapIndexType *widx, ...)
 			if (items <= 2) {
 				op = Rowop::OP_INSERT;
 			} else if (items == 3) {
-				if (!parseOpcode(funcName, ST(2), op))
-					break;
+				op = parseOpcode(funcName, ST(2)); // may throw
 			} else {
 				throw TRICEPS_NS::Exception::f("Usage: %s(self, widx [, opcode])", funcName);
 			}

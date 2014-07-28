@@ -1,5 +1,5 @@
 //
-// (C) Copyright 2011-2013 Sergey A. Babkin.
+// (C) Copyright 2011-2014 Sergey A. Babkin.
 // This file is a part of Triceps.
 // See the file COPYRIGHT for the copyright notice and license information
 //
@@ -23,7 +23,7 @@ public:
 	virtual void printTo(string &res, const string &indent = "", const string &subindent = "  ") const;
 
 	// from IndexType
-	virtual const_Onceref<NameSet> getKey() const;
+	virtual const NameSet *getKey() const;
 	virtual IndexType *copy(bool flat = false) const;
 	virtual IndexType *deepCopy(HoldRowTypes *holder) const;
 	virtual void initialize();

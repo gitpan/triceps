@@ -1,5 +1,5 @@
 //
-// (C) Copyright 2011-2013 Sergey A. Babkin.
+// (C) Copyright 2011-2014 Sergey A. Babkin.
 // This file is a part of Triceps.
 // See the file COPYRIGHT for the copyright notice and license information
 //
@@ -90,10 +90,10 @@ addSubIndex(WrapTableType *self, char *subname, WrapIndexType *sub)
 		clearErrMsg();
 		TableType *tbt = self->get();
 
-		if (tbt->isInitialized()) {
-			setErrMsg(strprintf("%s: table is already initialized, can not add indexes any more", funcName));
-			XSRETURN_UNDEF;
-		}
+		try { do {
+			if (tbt->isInitialized())
+				throw Exception::f("%s: table is already initialized, can not add indexes any more", funcName);
+		} while(0); } TRICEPS_CATCH_CROAK;
 
 		IndexType *ixsub = sub->get();
 		// can't just return self because it will upset the refcount
@@ -112,10 +112,27 @@ findSubIndex(WrapTableType *self, char *subname)
 		clearErrMsg();
 		TableType *tbt = self->get();
 		IndexType *ixsub = tbt->findSubIndex(subname);
-		if (ixsub == NULL) {
-			setErrMsg(strprintf("%s: unknown nested index '%s'", funcName, subname));
-			XSRETURN_UNDEF;
-		}
+		try { do {
+			if (ixsub == NULL) 
+				throw Exception::f("%s: unknown nested index '%s'", funcName, subname);
+		} while(0); } TRICEPS_CATCH_CROAK;
+		RETVAL = new WrapIndexType(ixsub);
+	OUTPUT:
+		RETVAL
+
+#// find a nested index by name, on failure just return undef
+WrapIndexType *
+findSubIndexSafe(WrapTableType *self, char *subname)
+	CODE:
+		static char funcName[] =  "Triceps::TableType::findSubIndex";
+		// for casting of return value
+		static char CLASS[] = "Triceps::IndexType";
+
+		clearErrMsg();
+		TableType *tbt = self->get();
+		IndexType *ixsub = tbt->findSubIndex(subname);
+		if (ixsub == NULL) 
+			XSRETURN_UNDEF; // not croak!
 		RETVAL = new WrapIndexType(ixsub);
 	OUTPUT:
 		RETVAL
@@ -127,20 +144,19 @@ findSubIndexById(WrapTableType *self, SV *idarg)
 		static char funcName[] =  "Triceps::TableType::findSubIndexById";
 		// for casting of return value
 		static char CLASS[] = "Triceps::IndexType";
+		RETVAL = NULL; // shut up the warning
 
-		clearErrMsg();
-		TableType *tbt = self->get();
+		try { do {
+			clearErrMsg();
+			TableType *tbt = self->get();
 
-		IndexType::IndexId id;
-		if (!parseIndexId(funcName, idarg, id))
-			XSRETURN_UNDEF;
+			IndexType::IndexId id = parseIndexId(funcName, idarg); // may throw
 
-		IndexType *ixsub = tbt->findSubIndexById(id);
-		if (ixsub == NULL) {
-			setErrMsg(strprintf("%s: no nested index with type id '%s' (%d)", funcName, IndexType::indexIdString(id), id));
-			XSRETURN_UNDEF;
-		}
-		RETVAL = new WrapIndexType(ixsub);
+			IndexType *ixsub = tbt->findSubIndexById(id);
+			if (ixsub == NULL)
+				throw Exception::f("%s: no nested index with type id '%s' (%d)", funcName, IndexType::indexIdString(id), id);
+			RETVAL = new WrapIndexType(ixsub);
+		} while(0); } TRICEPS_CATCH_CROAK;
 	OUTPUT:
 		RETVAL
 
@@ -175,10 +191,10 @@ getFirstLeaf(WrapTableType *self)
 		clearErrMsg();
 		TableType *tbt = self->get();
 		IndexType *leaf = tbt->getFirstLeaf();
-		if (leaf == NULL) {
-			setErrMsg(strprintf("%s: table type has no indexes defined", funcName));
-			XSRETURN_UNDEF;
-		}
+		try { do {
+			if (leaf == NULL)
+				throw Exception::f("%s: table type has no indexes defined", funcName);
+		} while(0); } TRICEPS_CATCH_CROAK;
 		RETVAL = new WrapIndexType(leaf);
 	OUTPUT:
 		RETVAL
@@ -201,11 +217,11 @@ initialize(WrapTableType *self)
 		TableType *tbt = self->get();
 		tbt->initialize();
 		Erref err = tbt->getErrors();
-		if (err->hasError()) {
-			setErrMsg(err->print());
-			XSRETURN_UNDEF;
-		}
 		RETVAL = 1;
+		try { do {
+			if (err->hasError())
+				throw Exception(err, false);
+		} while(0); } TRICEPS_CATCH_CROAK;
 	OUTPUT:
 		RETVAL
 

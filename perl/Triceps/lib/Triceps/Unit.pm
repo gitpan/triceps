@@ -1,5 +1,5 @@
 #
-# (C) Copyright 2011-2013 Sergey A. Babkin.
+# (C) Copyright 2011-2014 Sergey A. Babkin.
 # This file is a part of Triceps.
 # See the file COPYRIGHT for the copyright notice and license information
 #
@@ -7,9 +7,7 @@
 
 package Triceps::Unit;
 
-our $VERSION = 'v1.0.93';
-
-use Carp;
+our $VERSION = 'v2.0.0';
 
 # A convenience wrapper that creates the Rowop from
 # the field name-value pairs and then calls it.
@@ -21,8 +19,8 @@ sub makeHashCall # (self, label, opcode, fieldName => fieldValue, ...)
 {
 	my $self = shift;
 	my $label = shift;
-	my $rowop = $label->makeRowopHash(@_) or Carp::confess "$!";
-	my $res = $self->call($rowop) or Carp::confess "$!";
+	my $rowop = $label->makeRowopHash(@_);
+	my $res = $self->call($rowop);
 	return $res;
 }
 
@@ -36,8 +34,8 @@ sub makeArrayCall # (self, label, opcode, fieldValue, ...)
 {
 	my $self = shift;
 	my $label = shift;
-	my $rowop = $label->makeRowopArray(@_) or Carp::confess "$!";
-	my $res = $self->call($rowop) or Carp::confess "$!";
+	my $rowop = $label->makeRowopArray(@_);
+	my $res = $self->call($rowop);
 	return $res;
 }
 
@@ -51,8 +49,8 @@ sub makeHashSchedule # (self, label, opcode, fieldName => fieldValue, ...)
 {
 	my $self = shift;
 	my $label = shift;
-	my $rowop = $label->makeRowopHash(@_) or Carp::confess "$!";
-	my $res = $self->schedule($rowop) or Carp::confess "$!";
+	my $rowop = $label->makeRowopHash(@_);
+	my $res = $self->schedule($rowop);
 	return $res;
 }
 
@@ -66,8 +64,8 @@ sub makeArraySchedule # (self, label, opcode, fieldValue, ...)
 {
 	my $self = shift;
 	my $label = shift;
-	my $rowop = $label->makeRowopArray(@_) or Carp::confess "$!";
-	my $res = $self->schedule($rowop) or Carp::confess "$!";
+	my $rowop = $label->makeRowopArray(@_);
+	my $res = $self->schedule($rowop);
 	return $res;
 }
 
@@ -83,8 +81,8 @@ sub makeHashLoopAt # (self, mark, label, opcode, fieldName => fieldValue, ...)
 	my $self = shift;
 	my $mark = shift;
 	my $label = shift;
-	my $rowop = $label->makeRowopHash(@_) or Carp::confess "$!";
-	my $res = $self->loopAt($mark, $rowop) or Carp::confess "$!";
+	my $rowop = $label->makeRowopHash(@_);
+	my $res = $self->loopAt($mark, $rowop);
 	return $res;
 }
 
@@ -100,14 +98,15 @@ sub makeArrayLoopAt # (self, mark, label, opcode, fieldValue, ...)
 	my $self = shift;
 	my $mark = shift;
 	my $label = shift;
-	my $rowop = $label->makeRowopArray(@_) or Carp::confess "$!";
-	my $res = $self->loopAt($mark, $rowop) or Carp::confess "$!";
+	my $rowop = $label->makeRowopArray(@_);
+	my $res = $self->loopAt($mark, $rowop);
 	return $res;
 }
 
 # Create a whole combination for the start of the loop:
 #  1. The first label inside the actual loop, that runs on
-#    every iteration. It gets the clearSub and execSub to execute in it.
+#    every iteration. It gets the clearSub and execSub to execute in it,
+#    same as the usual Perl label creation.
 #    The user code doesn't need to bother about setting
 #    the frame mark, it's set in the wrapper.
 #  2. The frame mark.
@@ -117,25 +116,25 @@ sub makeArrayLoopAt # (self, mark, label, opcode, fieldValue, ...)
 # @param rt - row type for the looping rows
 # @param name - base name for the labels and the mark.
 #     The names are created with suffixes as:
-#     1. First label in the loop: .next
+#     1. First label in the loop: no suffix
 #     2. The frame mark: .mark
 # @param clearSub - clearing function for .next
 # @param execSub - handler function for .next
 # @param args - args for .next
 # @returns - a pair of
-#     ($next_label, $frame_mark)
+#     ($label, $frame_mark)
 sub makeLoopHead # ($self, $rt, $name, $clearSub, $execSub, @args)
 {
 	my ($self, $rt, $name, $clear, $exec, @args) = @_;
 
-	my $mark = Triceps::FrameMark->new($name . ".mark") or confess "$!";
+	my $mark = Triceps::FrameMark->new($name . ".mark");
 
-	my $lbNext = $self->makeLabel($rt, $name . ".next", $clear, sub {
+	my $label = $self->makeLabel($rt, $name, $clear, sub {
 		$self->setMark($mark);
 		&$exec(@_);
-	}, @args) or confess "$!";
+	}, @args);
 
-	return ($lbNext, $mark);
+	return ($label, $mark);
 }
 
 # Similar to makeLoopHead() but the first label inside the loop
@@ -146,26 +145,26 @@ sub makeLoopHead # ($self, $rt, $name, $clearSub, $execSub, @args)
 #
 # @param name - base name for the labels and the mark.
 #     The names are created with suffixes as:
-#     1. Wrapper for the first label in the loop: .wrapnext;
-#        that should be used with loopAt().
+#     1. Wrapper for the first label in the loop: no suffix;
+#        this label is the one that should be used with loopAt().
 #     2. The frame mark: .mark
 # @param lbFirst - the label that starts the loop. Its row type
 #     also becomes the row type of the created labels.
-# @returns - a triplet of
-#     ($next_label, $frame_mark)
+# @returns - a pair of
+#     ($label, $frame_mark)
 sub makeLoopAround # ($self, $name, $lbFirst)
 {
 	my ($self, $name, $lbFirst) = @_;
 	my $rt = $lbFirst->getRowType();
 
-	my $mark = Triceps::FrameMark->new($name . ".mark") or confess "$!";
+	my $mark = Triceps::FrameMark->new($name . ".mark");
 
-	my $lbWrapNext = $self->makeLabel($rt, $name . ".wrapnext", undef, sub {
+	my $lbWrap = $self->makeLabel($rt, $name, undef, sub {
 		$self->setMark($mark);
-	}) or confess "$!";
-	$lbWrapNext->chain($lbFirst);
+	});
+	$lbWrap->chain($lbFirst);
 
-	return ($lbWrapNext, $mark);
+	return ($lbWrap, $mark);
 }
 
 1;

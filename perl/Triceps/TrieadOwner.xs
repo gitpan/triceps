@@ -1,5 +1,5 @@
 //
-// (C) Copyright 2011-2013 Sergey A. Babkin.
+// (C) Copyright 2011-2014 Sergey A. Babkin.
 // This file is a part of Triceps.
 // See the file COPYRIGHT for the copyright notice and license information
 //
@@ -43,7 +43,7 @@ DESTROY(WrapTrieadOwner *self)
 #// @param tid - thread id (as in $thr->tid()) where this TrieadOwner belongs, for joining 
 #//        (or undef could be used for testing purposes but then you jave to join
 #//        the thread yourself)
-#// @param handle - the thread's low-level handle (as returned by thr()->handle_()), or undef;
+#// @param handle - the thread's low-level handle (as returned by $thr->handle_()), or undef;
 #//        this is a dangerous argument, and passing a wrong value here may cause a crash
 #// @param app - app object ref or name
 #// @param tname - name of this thread in the app
@@ -666,8 +666,8 @@ nextXtrayTimeLimit(WrapTrieadOwner *self, double limit)
 		RETVAL = 0;
 		try { do {
 			timespec tm;
-			tm.tv_sec = (int)limit;
-			tm.tv_nsec = (limit - (int)limit)*1000000000;
+			tm.tv_sec = (int64_t)limit;
+			tm.tv_nsec = (limit - (int64_t)limit)*1000000000;
 			RETVAL = self->get()->nextXtray(true, tm);
 		} while(0); } TRICEPS_CATCH_CROAK;
 	OUTPUT:
@@ -680,8 +680,8 @@ nextXtrayTimeout(WrapTrieadOwner *self, double tout)
 		clearErrMsg();
 		RETVAL = 0;
 		try { do {
-			int64_t sec = (int)tout;
-			int32_t nsec = (tout - (int)tout)*1000000000;
+			int64_t sec = (int64_t)tout;
+			int32_t nsec = (tout - (int64_t)tout)*1000000000;
 			RETVAL = self->get()->nextXtrayTimeout(sec, nsec);
 		} while(0); } TRICEPS_CATCH_CROAK;
 	OUTPUT:
@@ -835,4 +835,3 @@ makeTrackedFileFd(WrapTrieadOwner *self, SV *file, int fd)
 
 #// }
 
-#// XXX add addUnit() etc

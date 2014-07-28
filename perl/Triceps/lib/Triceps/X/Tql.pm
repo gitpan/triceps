@@ -1,5 +1,5 @@
 #
-# (C) Copyright 2011-2013 Sergey A. Babkin.
+# (C) Copyright 2011-2014 Sergey A. Babkin.
 # This file is a part of Triceps.
 # See the file COPYRIGHT for the copyright notice and license information
 #
@@ -25,10 +25,10 @@ package Triceps::X::Tql;
 
 sub CLONE_SKIP { 1; }
 
-our $VERSION = 'v1.0.93';
+our $VERSION = 'v2.0.0';
 
 use Carp;
-use Triceps::X::Braced qw(:all);
+use Triceps::Braced qw(:all);
 use Triceps::X::ThreadedServer qw(printOrShut);
 use Safe;
 
@@ -262,7 +262,7 @@ sub initialize # ($self)
 			id => "string", # request id
 			name => "string", # the table name, for convenience of requestor
 			cmd => "string", # for convenience of requestor, the command that it is executing
-		) or confess "$!";
+		);
 
 		# row type for the communication between the client reader
 		# and writer threads, they will pass through the common
@@ -274,7 +274,7 @@ sub initialize # ($self)
 			arg1 => "string", # the arguments depend on the command
 			arg2 => "string",
 			arg3 => "string",
-		) or confess "$!";
+		);
 
 		# build the output side
 		for (my $i = 0; $i <= $#{$self->{tables}}; $i++) {
@@ -320,7 +320,7 @@ sub initialize # ($self)
 
 			$self->{faIn}->getLabel("in." . $name)->chain($input);
 		}
-		# the controll passes through
+		# the control passes through
 		$self->{faIn}->getLabel("control")->chain($self->{faOut}->getLabel("control"));
 
 		# build the dump requests, will be coming from below
@@ -460,7 +460,7 @@ sub _tqlRead # ($ctx, @args)
 		table => [ undef, \&Triceps::Opt::ck_mandatory ],
 	}, @_);
 
-	my $tabname = bunquote($opts->{table});
+	my $tabname = bunescape($opts->{table});
 	my $unit = $ctx->{u};
 
 	if ($ctx->{faOut}) {
@@ -547,7 +547,7 @@ sub _tqlPrint # ($ctx, @args)
 	&Triceps::Opt::parse("print", $opts, {
 		tokenized => [ 1, undef ],
 	}, @_);
-	my $tokenized = bunquote($opts->{tokenized}) + 0;
+	my $tokenized = bunescape($opts->{tokenized}) + 0;
 	my $prev = $ctx->{prev};
 
 	if ($ctx->{faOut}) {
@@ -566,21 +566,18 @@ sub _tqlPrint # ($ctx, @args)
 		# no need for end-of-data notification, the framework code will
 		# take care of it (and it's not end-of-data but end-of-dump)
 	} else {
-		# XXX This gets the printed label name from the auto-generated label name,
-		# which is not a good practice.
-		# XXX Should have a custom query name somewhere in the context?
 		if ($tokenized) {
 			# print in the tokenized format
 			$prev->makeChained("lb" . $ctx->{id} . "print", undef, sub {
-				&Triceps::X::SimpleServer::outCurBuf($_[1]->printP() . "\n");
-			});
+				&Triceps::X::SimpleServer::outCurBuf($_[1]->printP($_[2]) . "\n");
+			}, $ctx->{qname});
 		} else {
-			Triceps::X::SimpleServer::makeServerOutLabel($ctx->{prev});
+			Triceps::X::SimpleServer::makeServerOutLabel($ctx->{prev}, $ctx->{qname});
 		}
 
 		# The end-of-data notification. It will run after the current pipeline
 		# finishes.
-		my $prevname = $prev->getName();
+		my $prevname = $ctx->{qname};
 		push @{$ctx->{actions}}, sub {
 			&Triceps::X::SimpleServer::outCurBuf("+EOD,OP_NOP,$prevname\n");
 		};
@@ -638,7 +635,7 @@ sub _tqlJoin # ($ctx, @args)
 		type => [ "inner", undef ],
 	}, @_);
 
-	my $tabname = bunquote($opts->{table});
+	my $tabname = bunescape($opts->{table});
 	my $unit = $ctx->{u};
 	my $table;
 
@@ -686,8 +683,8 @@ sub _tqlJoin # ($ctx, @args)
 		}
 
 		# build the table from the type
-		$tt->initialize() or confess "$!";
-		$table = $ctx->{u}->makeTable($tt, "EM_CALL", "tab" . $ctx->{id} . $tabname);
+		$tt->initialize();
+		$table = $ctx->{u}->makeTable($tt, "tab" . $ctx->{id} . $tabname);
 		push @{$ctx->{copyTables}}, $table;
 
 		# build the request that fills the table with data and then
@@ -766,7 +763,7 @@ sub _tqlWhere # ($ctx, @args)
 	my $rt = $ctx->{prev}->getRowType();
 	my %def = $rt->getdef();
 
-	my $expr = bunquote($opts->{istrue});
+	my $expr = bunescape($opts->{istrue});
 	$expr =~ s/\$\%(\w+)/&replaceFieldRef(\%def, $1)/ge;
 
 	my $safe = new Safe; 
@@ -952,7 +949,7 @@ sub compileQuery # (@opts)
 	if (! eval {
 		foreach my $cmd (@cmds) {
 			my @args = split_braced($cmd);
-			my $argv0 = bunquote(shift @args);
+			my $argv0 = bunescape(shift @args);
 			# The rest of @args do not get unquoted here!
 			die "No such TQL command '$argv0'\n" unless exists $tqlDispatch{$argv0};
 			# XXX do something better with the errors, show the failing command...
@@ -1004,7 +1001,7 @@ sub listenerT
 	undef @_;
 	my $owner = $opts->{owner};
 
-	my ($tsock, $sock) = $owner->trackGetSocket($opts->{socketName}, "+<");
+	my ($tsock, $sock) = $owner->trackGetFile($opts->{socketName}, "+<");
 
 	$owner->readyReady();
 
@@ -1087,7 +1084,7 @@ sub readT
 	my $fragment = $opts->{fragment}; # this is the client name
 
 	# only dup the socket, the writer thread will consume it
-	my ($tsock, $sock) = $owner->trackDupSocket($opts->{socketName}, "<");
+	my ($tsock, $sock) = $owner->trackDupFile($opts->{socketName}, "<");
 
 	# messages will be sent here
 	my $faIn = $owner->importNexus(
@@ -1245,7 +1242,7 @@ sub writeT
 	my $fragment = $opts->{fragment}; # this is the client name
 	my @labels;
 
-	my ($tsock, $sock) = $owner->trackGetSocket($opts->{socketName}, ">");
+	my ($tsock, $sock) = $owner->trackGetFile($opts->{socketName}, ">");
 
 	# incoming data and control commands
 	my $faOut = $owner->importNexus(

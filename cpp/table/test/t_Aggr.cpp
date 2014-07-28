@@ -1,5 +1,5 @@
 //
-// (C) Copyright 2011-2013 Sergey A. Babkin.
+// (C) Copyright 2011-2014 Sergey A. Babkin.
 // This file is a part of Triceps.
 // See the file COPYRIGHT for the copyright notice and license information
 //
@@ -173,7 +173,7 @@ UTESTCASE tableops(Utest *utest)
 	UT_ASSERT(tt->getErrors().isNull());
 	UT_ASSERT(!tt->getErrors()->hasError());
 
-	Autoref<Table> t = tt->makeTable(unit, Table::EM_CALL, "t");
+	Autoref<Table> t = tt->makeTable(unit, "t");
 	UT_ASSERT(!t.isNull());
 
 	IndexType *prim = tt->findSubIndex("primary");
@@ -483,7 +483,7 @@ UTESTCASE tableops_fret(Utest *utest)
 	UT_ASSERT(tt->getErrors().isNull());
 	UT_ASSERT(!tt->getErrors()->hasError());
 
-	Autoref<Table> t = tt->makeTable(unit, Table::EM_CALL, "t");
+	Autoref<Table> t = tt->makeTable(unit, "t");
 	UT_ASSERT(!t.isNull());
 
 	Autoref<FnReturn> fret = t->fnReturn();
@@ -571,7 +571,7 @@ UTESTCASE bad_fret(Utest *utest)
 	UT_ASSERT(tt->getErrors().isNull());
 	UT_ASSERT(!tt->getErrors()->hasError());
 
-	Autoref<Table> t = tt->makeTable(unit, Table::EM_CALL, "t");
+	Autoref<Table> t = tt->makeTable(unit, "t");
 	UT_ASSERT(!t.isNull());
 
 	msg.clear();
@@ -651,7 +651,7 @@ UTESTCASE aggLast(Utest *utest)
 	UT_ASSERT(tt->getErrors().isNull());
 	UT_ASSERT(!tt->getErrors()->hasError());
 
-	Autoref<Table> t = tt->makeTable(unit, Table::EM_CALL, "t");
+	Autoref<Table> t = tt->makeTable(unit, "t");
 	UT_ASSERT(!t.isNull());
 
 	FdataVec dv;
@@ -733,8 +733,8 @@ UTESTCASE aggLast(Utest *utest)
 // aggregator that computes the sum of field C;
 // follows the outline of the Perl aggregators shown in xAgg.t
 void sumC(Table *table, AggregatorGadget *gadget, Index *index,
-        const IndexType *parentIndexType, GroupHandle *gh, Tray *dest,
-		Aggregator::AggOp aggop, Rowop::Opcode opcode, RowHandle *rh)
+	const IndexType *parentIndexType, GroupHandle *gh, Tray *dest,
+	Aggregator::AggOp aggop, Rowop::Opcode opcode, RowHandle *rh)
 {
 	// don't send the NULL record after the group becomes empty
 	if (opcode == Rowop::OP_NOP || parentIndexType->groupSize(gh) == 0)
@@ -759,10 +759,6 @@ void sumC(Table *table, AggregatorGadget *gadget, Index *index,
 	// gadget()->getType()->getRowType() and gadget->getLabel()->getType()
 	// are equivalent
 	Rowref res(gadget->getLabel()->getType(), fields);
-	// Potentially could even use directly
-	//     gadget->getLabel()->getType()->makeRow(fields)
-	// as the 2nd argument of sendDelayed() but it would cause a memory
-	// leak if the table's enqueueing mode is EM_IGNORE
 	gadget->sendDelayed(dest, res, opcode);
 }
 
@@ -803,7 +799,7 @@ UTESTCASE aggBasicSum(Utest *utest)
 	UT_ASSERT(tt->getErrors().isNull());
 	UT_ASSERT(!tt->getErrors()->hasError());
 
-	Autoref<Table> t = tt->makeTable(unit, Table::EM_CALL, "t");
+	Autoref<Table> t = tt->makeTable(unit, "t");
 	UT_ASSERT(!t.isNull());
 
 	FdataVec dv;
@@ -871,8 +867,8 @@ class MySumAggregator: public Aggregator
 public:
 	// same as sumC but finds the field from the type
 	virtual void handle(Table *table, AggregatorGadget *gadget, Index *index,
-			const IndexType *parentIndexType, GroupHandle *gh, Tray *dest,
-			Aggregator::AggOp aggop, Rowop::Opcode opcode, RowHandle *rh);
+		const IndexType *parentIndexType, GroupHandle *gh, Tray *dest,
+		Aggregator::AggOp aggop, Rowop::Opcode opcode, RowHandle *rh);
 };
 
 class MySumAggregatorType: public AggregatorType
@@ -978,8 +974,8 @@ protected:
 
 // same as sumC but finds the field from the type
 void MySumAggregator::handle(Table *table, AggregatorGadget *gadget, Index *index,
-		const IndexType *parentIndexType, GroupHandle *gh, Tray *dest,
-		Aggregator::AggOp aggop, Rowop::Opcode opcode, RowHandle *rh)
+	const IndexType *parentIndexType, GroupHandle *gh, Tray *dest,
+	Aggregator::AggOp aggop, Rowop::Opcode opcode, RowHandle *rh)
 {
 	// don't send the NULL record after the group becomes empty
 	if (opcode == Rowop::OP_NOP || parentIndexType->groupSize(gh) == 0)
@@ -1037,7 +1033,7 @@ UTESTCASE aggSum(Utest *utest)
 		return;
 	}
 
-	Autoref<Table> t = tt->makeTable(unit, Table::EM_CALL, "t");
+	Autoref<Table> t = tt->makeTable(unit, "t");
 	UT_ASSERT(!t.isNull());
 
 	FdataVec dv;

@@ -1,5 +1,5 @@
 //
-// (C) Copyright 2011-2013 Sergey A. Babkin.
+// (C) Copyright 2011-2014 Sergey A. Babkin.
 // This file is a part of Triceps.
 // See the file COPYRIGHT for the copyright notice and license information
 //
@@ -66,15 +66,40 @@ public:
 	void clear();
 
 	// Set code_. Implicitly does clear();
+	// On failure throws an Exception.
 	// @param code - Perl code reference for processing the rows; will check
 	//               for correctness; will make a copy of it (because if keeping a reference,
 	//               SV may change later, a copy is guaranteed to stay the same).
 	//               OR a string with the code: it will be remembered and also 
 	//               compiled into a sub {}. If the code is not a string, will
 	//               reset the threadable_ flag.
-	// @param fname - caller function name, for error messages
-	// @return - true on success, false (and error code) on failure.
-	bool setCode(SV *code, const char *fname);
+	// @param fname - function name for error messages.
+	void setCode(SV *code, const char *fname);
+
+	// Set code_. Implicitly does clear();
+	// On failure throws an Exception.
+	// The erro message prefix is a formattable string.
+	// @param code - Perl code reference for processing the rows; will check
+	//               for correctness; will make a copy of it (because if keeping a reference,
+	//               SV may change later, a copy is guaranteed to stay the same).
+	//               OR a string with the code: it will be remembered and also 
+	//               compiled into a sub {}. If the code is not a string, will
+	//               reset the threadable_ flag.
+	// @param fmt, ... - the prefix for the error message
+	void setCodeFmt(SV *code, const char *fmt, ...)
+		__attribute__((format(printf, 3, 4))); // +1 for "this"
+
+	// Set code_. Implicitly does clear();
+	// On failure throws an Exception.
+	// The version to pass through the va_args with format.
+	// @param code - Perl code reference for processing the rows; will check
+	//               for correctness; will make a copy of it (because if keeping a reference,
+	//               SV may change later, a copy is guaranteed to stay the same).
+	//               OR a string with the code: it will be remembered and also 
+	//               compiled into a sub {}. If the code is not a string, will
+	//               reset the threadable_ flag.
+	// @param fmt, ... - the prefix for the error message
+	void setCodeVa(SV *code, const char *fmt, va_list ap);
 
 	// Append another argument to args_.
 	// @param arg - argument value to append; will make a copy of it.
@@ -115,10 +140,13 @@ public:
 	// @param other - the original object
 	PerlCallback(const PerlCallback *other);
 
-	// compile the code from codestr_; leaves the result in code_ on success
-	// @param fname - caller function name, for error messages, or a placeholder
+	// compile the code from codestr_; leaves the result in code_ on success;
+	// the format can be either direct or pass-through
+	// @param fmt - message describing the caller function name, for error messages, or a placeholder
 	// @return - the error messages, or NULL if all successful
-	Erref compileCode(const char *fname);
+	Erref compileCodeFmt(const char *fmt, ...)
+		__attribute__((format(printf, 2, 3))); // +1 for "this"
+	Erref compileCodeVa(const char *fmt, va_list ap);
 
 	// for macros, the internals must be public
 	bool threadinit_; // the initial state of threadable stat, to be used after clearing, as came from the constructor
@@ -139,7 +167,7 @@ private:
 // equality comparison for two pointers to PerlCallback
 bool callbackEquals(const PerlCallback *p1, const PerlCallback *p2);
 
-// Initialize the PerlCallback object. On failure sets code_ to NULL and sets the error message.
+// Initialize the PerlCallback object. On failure throws an Exception.
 // (The code reference is split from the arguments).
 // @param cb - callback object poniter
 // @param fname - function name, for error messages
@@ -151,15 +179,14 @@ bool callbackEquals(const PerlCallback *p1, const PerlCallback *p2);
 		int _i = firstarg, _c = countarg; \
 		if (_c < 0) { \
 			cb->clear(); \
-			setErrMsg( string(fname) + ": missing Perl callback function reference argument" ); \
+			throw Exception::f("%s: missing Perl callback function reference argument", fname); \
 			break; \
 		} \
-		if (!cb->setCode(code, fname)) \
-			break; \
+		cb->setCode(code, fname); /* may throw */ \
 		while (_c-- > 0) \
 			cb->appendArg(ST(_i++)); \
 	} while(0)
-// Initialize the PerlCallback object. On failure sets code_ to NULL and sets the error message.
+// Initialize the PerlCallback object. On failure throws an Exception.
 // @param cb - callback object poniter
 // @param fname - function name, for error messages
 // @param first - index of the first argument, that must represent a code reference

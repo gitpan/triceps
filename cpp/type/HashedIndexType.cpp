@@ -1,5 +1,5 @@
 //
-// (C) Copyright 2011-2013 Sergey A. Babkin.
+// (C) Copyright 2011-2014 Sergey A. Babkin.
 // This file is a part of Triceps.
 // See the file COPYRIGHT for the copyright notice and license information
 //
@@ -113,13 +113,14 @@ HashedIndexType::HashedIndexType(const HashedIndexType &orig, HoldRowTypes *hold
 HashedIndexType *HashedIndexType::setKey(NameSet *key)
 {
 	if (initialized_) {
+		Autoref<HashedIndexType> cleaner = this;
 		throw Exception::fTrace("Attempted to set the key on an initialized Hashed index type");
 	}
 	key_ = key;
 	return this;
 }
 
-const_Onceref<NameSet> HashedIndexType::getKey() const
+const NameSet *HashedIndexType::getKey() const
 {
 	return key_;
 }

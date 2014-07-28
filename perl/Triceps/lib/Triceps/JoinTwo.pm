@@ -1,5 +1,5 @@
 #
-# (C) Copyright 2011-2013 Sergey A. Babkin.
+# (C) Copyright 2011-2014 Sergey A. Babkin.
 # This file is a part of Triceps.
 # See the file COPYRIGHT for the copyright notice and license information
 #
@@ -9,7 +9,7 @@ package Triceps::JoinTwo;
 
 sub CLONE_SKIP { 1; }
 
-our $VERSION = 'v1.0.93';
+our $VERSION = 'v2.0.0';
 
 use Carp;
 
@@ -368,7 +368,6 @@ sub new # (class, optionName => optionValue ...)
 
 	# create the output label
 	$self->{outputLabel} = $self->{unit}->makeDummyLabel($self->{leftLookup}->getResultRowType(), $self->{name} . ".out");
-	Carp::confess("$!") unless (ref $self->{outputLabel} eq "Triceps::Label");
 
 	# and connect them together
 	$self->{leftFromLabel}->chain($self->{leftLookup}->getInputLabel());

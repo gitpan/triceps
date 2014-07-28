@@ -1,5 +1,5 @@
 //
-// (C) Copyright 2011-2013 Sergey A. Babkin.
+// (C) Copyright 2011-2014 Sergey A. Babkin.
 // This file is a part of Triceps.
 // See the file COPYRIGHT for the copyright notice and license information
 //
@@ -109,14 +109,9 @@ void croakWithMsg(const char *msg)
 	Perl_croak(aTHX_ "%s", msg);
 }
 
+#if 0 // {
 void clearErrMsg()
 {
-	{
-		SV *errsv = get_sv("!", 0);
-		if (errsv) {
-			sv_setpvn(errsv, "", 0);
-		}
-	}
 	{
 		SV *msgsv = get_sv("Triceps::_CROAK_MSG", 0);
 		if (msgsv && SvOK(msgsv)) {
@@ -124,30 +119,12 @@ void clearErrMsg()
 		}
 	}
 }
+#endif // }
 
 // XXX Add mode when all the error messages will be fatal?
 // This will work only with exit(1), not croak() because croak() would mess up C++ stack.
 
 // XXX Should also set the numeric value to EINVAL?
-
-void setErrMsg(const std::string &msg)
-{
-	// chop the trailing \n if present
-	int  len = msg.size();
-	if (!msg.empty() && msg[msg.size()-1] == '\n')
-		len--;
-
-	SV *errsv = get_sv("!", 0);
-	if (errsv) {
-		sv_setpvn(errsv, msg.c_str(), len);
-	} else {
-		warn("Triceps: can not set $! with error: %s", msg.c_str());
-	}
-
-	// in case if the function checks for exceptions, check the croak message too
-	// XXX in the future there will probably be just exceptions, no setErrMsg()
-	setCroakMsg(msg);
-}
 
 bool svToBytes(Type::TypeId ti, SV *val, char *bytes)
 {
@@ -198,8 +175,7 @@ EasyBuffer * valToBuf(Type::TypeId ti, SV *arg, const char *fname)
 	case Type::TT_UINT8:
 	case Type::TT_STRING:
 		if (SvROK(arg)) {
-			setErrMsg(strprintf("Triceps field '%s' data conversion: array reference may not be used for string and uint8", fname));
-			return NULL;
+			throw Exception::f("Triceps field '%s' data conversion: array reference may not be used for string and uint8", fname);
 		}
 		if (ti == Type::TT_UINT8) {
 			xsv = SvPV(arg, slen);
@@ -227,8 +203,7 @@ EasyBuffer * valToBuf(Type::TypeId ti, SV *arg, const char *fname)
 		slen = sizeof(double);
 		break;
 	default:
-		setErrMsg(strprintf("Triceps field '%s' data conversion: invalid field type???", fname));
-		return NULL;
+		throw Exception::f("Triceps field '%s' data conversion: invalid field type???", fname);
 		break;
 	}
 
@@ -237,8 +212,7 @@ EasyBuffer * valToBuf(Type::TypeId ti, SV *arg, const char *fname)
 	if (SvROK(arg)) {
 		AV *lst = (AV *)SvRV(arg);
 		if (SvTYPE(lst) != SVt_PVAV) {
-			setErrMsg(strprintf("Triceps field '%s' data conversion: reference not to an array", fname));
-			return NULL;
+			throw Exception::f("Triceps field '%s' data conversion: reference not to an array", fname);
 		}
 		int llen = av_len(lst)+1; // it's the Perl $#array, so add 1
 
@@ -250,8 +224,7 @@ EasyBuffer * valToBuf(Type::TypeId ti, SV *arg, const char *fname)
 		for (int i = 0; i < llen; i++, xsv += slen) {
 			if (!svToBytes(ti, *av_fetch(lst, i, 0),  xsv)) {
 				delete buf;
-				setErrMsg(strprintf("Triceps field '%s' element %d data conversion: non-numeric value", fname, i));
-				return NULL;
+				throw Exception::f("Triceps field '%s' element %d data conversion: non-numeric value", fname, i);
 			}
 		}
 	} else {
@@ -259,8 +232,7 @@ EasyBuffer * valToBuf(Type::TypeId ti, SV *arg, const char *fname)
 		buf->size_ = slen;
 		if (!svToBytes(ti, arg,  buf->data_)) {
 			delete buf;
-			setErrMsg(strprintf("Triceps field '%s' data conversion: non-numeric value", fname));
-			return NULL;
+			throw Exception::f("Triceps field '%s' data conversion: non-numeric value", fname);
 		}
 	}
 	return buf;
@@ -352,8 +324,7 @@ SV *bytesToVal(Type::TypeId ti, int arsz, bool notNull, const char *data, intptr
 Onceref<NameSet> parseNameSet(const char *funcName, const char *optname, SV *optval)
 {
 	if (!SvROK(optval) || SvTYPE(SvRV(optval)) != SVt_PVAV) {
-		setErrMsg(strprintf("%s: option '%s' value must be an array reference", funcName, optname));
-		return NULL;
+		throw Exception::f("%s: option '%s' value must be an array reference", funcName, optname);
 	}
 	Onceref<NameSet> key = new NameSet;
 	AV *ka = (AV *)SvRV(optval);
@@ -367,30 +338,26 @@ Onceref<NameSet> parseNameSet(const char *funcName, const char *optname, SV *opt
 	return key;
 }
 
-bool parseEnqMode(const char *funcName, SV *enqMode, Gadget::EnqMode &em)
+Gadget::EnqMode parseEnqMode(const char *funcName, SV *enqMode)
 {
 	int intem;
 	// accept enqueueing mode as either number of name
 	if (SvIOK(enqMode)) {
 		intem = SvIV(enqMode);
 		if (Gadget::emString(intem, NULL) == NULL) {
-			setErrMsg(strprintf("%s: unknown enqueuing mode integer %d", funcName, intem));
-			return false;
+			throw Exception::f("%s: unknown enqueuing mode integer %d", funcName, intem);
 		}
-		// em = (Gadget::EnqMode)intem;
 	} else {
 		const char *emname = SvPV_nolen(enqMode);
 		intem = Gadget::stringEm(emname);
 		if (intem == -1) {
-			setErrMsg(strprintf("%s: unknown enqueuing mode string '%s', if integer was meant, it has to be cast", funcName, emname));
-			return false;
+			throw Exception::f("%s: unknown enqueuing mode string '%s', if integer was meant, it has to be cast", funcName, emname);
 		}
 	}
-	em = (Gadget::EnqMode)intem;
-	return true;
+	return (Gadget::EnqMode)intem;
 }
 
-bool parseOpcode(const char *funcName, SV *opcode, Rowop::Opcode &op)
+Rowop::Opcode parseOpcode(const char *funcName, SV *opcode)
 {
 	int intop;
 	// accept opcode as either number of name
@@ -400,15 +367,13 @@ bool parseOpcode(const char *funcName, SV *opcode, Rowop::Opcode &op)
 		const char *opname = SvPV_nolen(opcode);
 		intop = Rowop::stringOpcode(opname);
 		if (intop == Rowop::OP_BAD) {
-			setErrMsg(strprintf("%s: unknown opcode string '%s', if integer was meant, it has to be cast", funcName, opname));
-			return false;
+			throw Exception::f("%s: unknown opcode string '%s', if integer was meant, it has to be cast", funcName, opname);
 		}
 	}
-	op = (Rowop::Opcode)intop;
-	return true;
+	return (Rowop::Opcode)intop;
 }
 
-bool parseIndexId(const char *funcName, SV *idarg, IndexType::IndexId &id)
+IndexType::IndexId parseIndexId(const char *funcName, SV *idarg)
 {
 	int intid;
 	// accept idarg as either number of name
@@ -418,15 +383,13 @@ bool parseIndexId(const char *funcName, SV *idarg, IndexType::IndexId &id)
 		const char *idname = SvPV_nolen(idarg);
 		intid = IndexType::stringIndexId(idname);
 		if (intid < 0) {
-			setErrMsg(strprintf("%s: unknown IndexId string '%s', if integer was meant, it has to be cast", funcName, idname));
-			return false;
+			throw Exception::f("%s: unknown IndexId string '%s', if integer was meant, it has to be cast", funcName, idname);
 		}
 	}
-	id = (IndexType::IndexId)intid;
-	return true;
+	return (IndexType::IndexId)intid;
 }
 
-bool enqueueSv(char *funcName, Unit *u, FrameMark *mark, Gadget::EnqMode em, SV *arg, int i)
+void enqueueSv(char *funcName, Unit *u, FrameMark *mark, Gadget::EnqMode em, SV *arg, int i)
 {
 	if( sv_isobject(arg) && (SvTYPE(SvRV(arg)) == SVt_PVMG) ) {
 		WrapRowop *wrop = (WrapRowop *)SvIV((SV*)SvRV( arg ));
@@ -434,9 +397,8 @@ bool enqueueSv(char *funcName, Unit *u, FrameMark *mark, Gadget::EnqMode em, SV 
 		if (wrop != 0 && !wrop->badMagic()) {
 			Rowop *rop = wrop->get();
 			if (rop->getLabel()->getUnitPtr() != u) {
-				setErrMsg( strprintf("%s: argument %d is a Rowop for label %s from a wrong unit %s", funcName, i,
-					rop->getLabel()->getName().c_str(), rop->getLabel()->getUnitName().c_str()) );
-				return false;
+				throw Exception::f("%s: argument %d is a Rowop for label %s from a wrong unit %s", funcName, i,
+					rop->getLabel()->getName().c_str(), rop->getLabel()->getUnitName().c_str());
 			}
 			if (mark)
 				u->loopAt(mark, rop);
@@ -444,23 +406,19 @@ bool enqueueSv(char *funcName, Unit *u, FrameMark *mark, Gadget::EnqMode em, SV 
 				u->enqueue(em, rop);
 		} else if (wtray != 0 && !wtray->badMagic()) {
 			if (wtray->getParent() != u) {
-				setErrMsg( strprintf("%s: argument %d is a Tray from a wrong unit %s", funcName, i,
-					wtray->getParent()->getName().c_str()) );
-				return false;
+				throw Exception::f("%s: argument %d is a Tray from a wrong unit %s", funcName, i,
+					wtray->getParent()->getName().c_str());
 			}
 			if (mark)
 				u->loopTrayAt(mark, wtray->get());
 			else
 				u->enqueueTray(em, wtray->get());
 		} else {
-			setErrMsg( strprintf("%s: argument %d has an incorrect magic for either Rowop or Tray", funcName, i) );
-			return false;
+			throw Exception::f("%s: argument %d has an incorrect magic for either Rowop or Tray", funcName, i);
 		}
 	} else{
-		setErrMsg( strprintf("%s: argument %d is not a blessed SV reference to Rowop", funcName, i) );
-		return false;
+		throw Exception::f("%s: argument %d is not a blessed SV reference to Rowop", funcName, i);
 	}
-	return true;
 }
 
 char *translateUnitTracerSubclass(const Unit::Tracer *tr)
@@ -543,8 +501,8 @@ void GetSvArrayOrHash(AV *&array, HV *&hash, SV *svptr, const char *fmt, ...)
 
 Label *GetSvLabelOrCode(SV *svptr, const char *fmt, ...)
 {
-	if (SvROK(svptr) && SvTYPE(SvRV(svptr)) == SVt_PVCV)
-		// this is a code reference
+	if (SvROK(svptr) && SvTYPE(SvRV(svptr)) == SVt_PVCV // this is a code reference
+	|| SvPOK(svptr)) // or a code snippet
 		return NULL;
 
 	if (!sv_isobject(svptr) || SvTYPE(SvRV(svptr)) != SVt_PVMG) {
@@ -552,7 +510,7 @@ Label *GetSvLabelOrCode(SV *svptr, const char *fmt, ...)
 		va_start(ap, fmt);
 		string s = vstrprintf(fmt, ap);
 		va_end(ap);
-		throw Exception(strprintf("%s value must be a reference to Triceps::Label or a function", 
+		throw Exception(strprintf("%s value must be a code snippet or a reference to code or Triceps::Label", 
 			s.c_str()), false);
 	}
 	WrapLabel *wvar = (WrapLabel *)SvIV((SV*)SvRV( svptr ));

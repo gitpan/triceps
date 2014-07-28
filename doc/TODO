@@ -1,9 +1,10 @@
 Things that need to be done:
+* make a Triceps version of confess() - see blog 255*, 256*
 * check the labels for belonging to a right unit when enqueueing?
 * in Rowop construction replace asserts with exceptions
-* redo the errors to confess
-* change the typemap to confess
 * remove the enqueueing mode in Rowops, and in Unit::enqueueDelayedTray(), and in table output
+* SimpleAggregator multithreading support - requires adding the init function that runs at
+  TableType init time for aggrgators in general - see sc_mt_objects
 * more features for the SimpleAggregator
  ** standard deviation can be done in one pass
  ** median and percentiles on sorted indexes
@@ -117,23 +118,32 @@ Things that need to be done:
   fields still would have to be provided from the other side of the join
   to compute the index value); the assigned name must not conflict with the
   field names of the row type
+* makeTable() in C++ and Perl is inconsistent: on TableType in C++, on Unit in Perl
+* with the abolishment of the enqueueing mode in Table, Gadget became kind of useless
+* add the index lookup in the TableType and IndexType that returns undef if not found
+* in C++ add next() and such on Rhref
+* change the aggregator types to not have an own name, but to be named in a table type
+* provide a default AggregatorType::makeGadget() that makes the generic AggregatorGadget
+* add an option to adopt the rowop during the label chaining
+* add callAdopted() that combines $unit->call($label->adopt($rowop))
+* in FnBinding::call() allow to get back the tray (see "Streaming functions and more recursion")
+* add a C++ version of scoped FileInterrupt registration, like Perl TrackedFile
+* in nexuses with unicast capability, add the identity of a receiver facet as an address
+  (string or int) and specify it in the BEGIN row as a string or int or int array field
+* in harvester, if an abort is detected, limit the waiting time for the thread exit;
+  propagate the error if timing out (see the Perl App reference, app timeout)
+* docbook: make it not access http://docbook.sourceforge.net/release/images/draft.png
 
-* doc: the SQLy way, refer to the filtering example in sc_joins_lookup_manual
-
-* doc: in types construction throw instead of abort()
-* doc: Autoref::swap()
-* doc: croak() in typemap, it croaks nicely, with a stack trace
-* doc: FnReturn::isFaceted() in Perl and C++
-* doc: how index comparators can return errors through table->setStickyError()
-* doc: in docbook update the source code produced by SimpleAggregator
-* doc: Rowop::printP argument for an explicit name
-* doc: in C++ Unit isFrameEmpty(), isInOuterFrame() (add in Perl too?)
-* doc: autodetection of NSPR
-* doc: removed setName() in Unit and Label (and in C++ Gadget)
+* doc: reference for all the X classes in Perl
+* doc: for all Perl examples, show in the text the file that contains them
+* doc: a better "Hello, world"
 
 App ideas:
 * queries on CSV files - already done in DBD::CSV?
 * distributed cron
 * data cache
 * the challenges from http://www.orgs.ttu.edu/debs2013/
+* look at the use with RabbitMQ
 
+tangent 144, 157, 191, 197, 199, 204, 206, 271, 272, 274, 277, 279
+*** next 283

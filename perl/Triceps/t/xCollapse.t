@@ -1,5 +1,5 @@
 #
-# (C) Copyright 2011-2013 Sergey A. Babkin.
+# (C) Copyright 2011-2014 Sergey A. Babkin.
 # This file is a part of Triceps.
 # See the file COPYRIGHT for the copyright notice and license information
 #
@@ -68,15 +68,14 @@ sub new # ($class, $optName => $optValue, ...)
 	}, @_);
 	
 	# parse the data element
-	my $dataref = $self->{data};
+	my %data_unparsed = @{$self->{data}};
 	my $dataset = {};
-	# dataref->[1] is the best guess for the dataset name, in case if the option "name" goes first
-	&Triceps::Opt::parse("$class data set (" . $dataref->[1] . ")", $dataset, {
+	&Triceps::Opt::parse("$class data set (" . ($data_unparsed{name} or 'UNKNOWN') . ")", $dataset, {
 		name => [ undef, \&Triceps::Opt::ck_mandatory ],
 		key => [ undef, sub { &Triceps::Opt::ck_mandatory(@_); &Triceps::Opt::ck_ref(@_, "ARRAY", "") } ],
 		rowType => [ undef, sub { &Triceps::Opt::ck_ref(@_, "Triceps::RowType"); } ],
 		fromLabel => [ undef, sub { &Triceps::Opt::ck_ref(@_, "Triceps::Label"); } ],
-	}, @$dataref);
+	}, @{$self->{data}});
 
 	# save the dataset for the future
 	$self->{datasets}{$dataset->{name}} = $dataset;
@@ -97,20 +96,18 @@ sub new # ($class, $optName => $optValue, ...)
 		->addSubIndex("primary", 
 			Triceps::IndexType->newHashed(key => $dataset->{key})
 		);
-	$dataset->{tt}->initialize() 
-		or confess "Collapse table type creation error for dataset '" . $dataset->{name} . "':\n$! ";
+	$dataset->{tt}->initialize() ;
+		# XXX extended error "Collapse table type creation error for dataset '" . $dataset->{name} . "':\n$! ";
 
-	$dataset->{tbInsert} = $self->{unit}->makeTable($dataset->{tt}, "EM_CALL", $self->{name} . "." . $dataset->{name} . ".tbInsert")
-		or confess "Collapse internal error: insert table creation for dataset '" . $dataset->{name} . "':\n$! ";
-	$dataset->{tbDelete} = $self->{unit}->makeTable($dataset->{tt}, "EM_CALL", $self->{name} . "." . $dataset->{name} . ".tbInsert")
-		or confess "Collapse internal error: delete table creation for dataset '" . $dataset->{name} . "':\n$! ";
+	$dataset->{tbInsert} = $self->{unit}->makeTable($dataset->{tt}, $self->{name} . "." . $dataset->{name} . ".tbInsert");
+	$dataset->{tbDelete} = $self->{unit}->makeTable($dataset->{tt}, $self->{name} . "." . $dataset->{name} . ".tbInsert");
 
 	# create the labels
 	$dataset->{lbIn} = $self->{unit}->makeLabel($dataset->{rowType}, $self->{name} . "." . $dataset->{name} . ".in", 
-		undef, \&_handleInput, $self, $dataset)
-			or confess "Collapse internal error: input label creation for dataset '" . $dataset->{name} . "':\n$! ";
-	$dataset->{lbOut} = $self->{unit}->makeDummyLabel($dataset->{rowType}, $self->{name} . "." . $dataset->{name} . ".out")
-		or confess "Collapse internal error: output label creation for dataset '" . $dataset->{name} . "':\n$! ";
+		undef, \&_handleInput, $self, $dataset);
+			# XXX extended error "Collapse internal error: input label creation for dataset '" . $dataset->{name} . "':\n$! ";
+	$dataset->{lbOut} = $self->{unit}->makeDummyLabel($dataset->{rowType}, $self->{name} . "." . $dataset->{name} . ".out");
+		# XXX extended error "Collapse internal error: output label creation for dataset '" . $dataset->{name} . "':\n$! ";
 			
 	# chain the input label, if any
 	if (defined $lbFrom) {
@@ -238,7 +235,7 @@ our $rtData = Triceps::RowType->new(
 	local_ip => "string",
 	remote_ip => "string",
 	bytes => "int64",
-) or confess "$!";
+);
 
 #########################
 
@@ -284,11 +281,11 @@ my $collapse = MyCollapse->new(
 eval {
 	$collapse->getInputLabel("nosuch");
 };
-ok($@ =~ /^Unknown dataset 'nosuch'/);
+ok($@, qr/^Unknown dataset 'nosuch'/);
 eval {
 	$collapse->getOutputLabel("nosuch");
 };
-ok($@ =~ /^Unknown dataset 'nosuch'/);
+ok($@, qr/^Unknown dataset 'nosuch'/);
 
 my $lbPrint = makePrintLabel("print", $collapse->getOutputLabel("idata"));
 
@@ -368,11 +365,11 @@ sub tryMissingOptValue # (optName)
 }
 
 &tryMissingOptValue("unit");
-ok($@ =~ /^Option 'unit' must be specified for class 'MyCollapse'/);
+ok($@, qr/^Option 'unit' must be specified for class 'MyCollapse'/);
 &tryMissingOptValue("name");
-ok($@ =~ /^Option 'name' must be specified for class 'MyCollapse'/);
+ok($@, qr/^Option 'name' must be specified for class 'MyCollapse'/);
 &tryMissingOptValue("data");
-ok($@ =~ /^Option 'data' must be specified for class 'MyCollapse'/);
+ok($@, qr/^Option 'data' must be specified for class 'MyCollapse'/);
 
 sub tryMissingDataOptValue # (optName)
 {
@@ -395,11 +392,11 @@ sub tryMissingDataOptValue # (optName)
 }
 
 &tryMissingDataOptValue("key");
-ok($@ =~ /^Option 'key' must be specified for class 'MyCollapse data set \(idata\)'/);
+ok($@, qr/^Option 'key' must be specified for class 'MyCollapse data set \(idata\)'/);
 &tryMissingDataOptValue("name");
-ok($@ =~ /^Option 'name' must be specified for class 'MyCollapse data set/);
+ok($@, qr/^Option 'name' must be specified for class 'MyCollapse data set/);
 &tryMissingDataOptValue("rowType");
-ok($@ =~ /^The data set \(idata\) must have exactly one of options rowType or fromLabel/);
+ok($@, qr/^The data set \(idata\) must have exactly one of options rowType or fromLabel/);
 
 sub tryBadOptValue # (optName, optValue, ...)
 {
@@ -420,9 +417,9 @@ sub tryBadOptValue # (optName, optValue, ...)
 }
 
 &tryBadOptValue("unit", 9);
-ok($@ =~ /^Option 'unit' of class 'MyCollapse' must be a reference to 'Triceps::Unit', is ''/);
+ok($@, qr/^Option 'unit' of class 'MyCollapse' must be a reference to 'Triceps::Unit', is ''/);
 &tryBadOptValue("data", 9);
-ok($@ =~ /^Option 'data' of class 'MyCollapse' must be a reference to 'ARRAY', is ''/);
+ok($@, qr/^Option 'data' of class 'MyCollapse' must be a reference to 'ARRAY', is ''/);
 {
 	my $unit = Triceps::Unit->new("unit");
 	&tryBadOptValue("data",[
@@ -433,7 +430,7 @@ ok($@ =~ /^Option 'data' of class 'MyCollapse' must be a reference to 'ARRAY', i
 		key => [ "local_ip", "remote_ip" ],
 	]);
 }
-ok($@ =~ /^The data set \(idata\) must have only one of options rowType or fromLabel /);
+ok($@, qr/^The data set \(idata\) must have only one of options rowType or fromLabel /);
 {
 	my $unit = Triceps::Unit->new("unit");
 	&tryBadOptValue("data",[
@@ -442,7 +439,7 @@ ok($@ =~ /^The data set \(idata\) must have only one of options rowType or fromL
 		key => [ "local_ip", "remote_ip" ],
 	]);
 }
-ok($@ =~ /^The unit of the Collapse and the unit of its data set \(idata\) fromLabel must be the same/);
+ok($@, qr/^The unit of the Collapse and the unit of its data set \(idata\) fromLabel must be the same/);
 
 sub tryBadDataOptValue # (optName, optValue, ...)
 {
@@ -465,8 +462,10 @@ sub tryBadDataOptValue # (optName, optValue, ...)
 }
 
 &tryBadDataOptValue("key", [ "xxx" ]);
-ok($@ =~ /^Collapse table type creation error for dataset 'idata':
-index error:
+# XXX This explanatory message doesn't propagate after the
+# TableType got converted to the new error reporting.
+# qr/^Collapse table type creation error for dataset 'idata':
+ok($@, 
+qr/^index error:
   nested index 1 'primary':
-    can not find the key field 'xxx'/);
-#print "$@\n";
+    can not find the key field 'xxx' at/);

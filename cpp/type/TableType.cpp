@@ -1,5 +1,5 @@
 //
-// (C) Copyright 2011-2013 Sergey A. Babkin.
+// (C) Copyright 2011-2014 Sergey A. Babkin.
 // This file is a part of Triceps.
 // See the file COPYRIGHT for the copyright notice and license information
 //
@@ -25,7 +25,7 @@ TableType::TableType(Onceref<RowType> rt) :
 TableType::~TableType()
 { }
 
-TableType *TableType::copy()
+TableType *TableType::copy() const
 {
 	TableType *cpt = new TableType(rowType_);
 	// replace the root index type with a copy
@@ -44,6 +44,7 @@ TableType *TableType::deepCopy(HoldRowTypes *holder) const
 TableType *TableType::addSubIndex(const string &name, IndexType *index)
 {
 	if (initialized_) {
+		Autoref<TableType> cleaner = this;
 		throw Exception::fTrace("Attempted to add a sub-index '%s' to an initialized table type", name.c_str());
 	}
 	root_->addSubIndex(name, index);
@@ -150,12 +151,12 @@ void TableType::initialize()
 		errors_ = NULL;
 }
 
-Onceref<Table> TableType::makeTable(Unit *unit, Gadget::EnqMode emode, const string &name) const
+Onceref<Table> TableType::makeTable(Unit *unit, const string &name) const
 {
 	if (!initialized_ || errors_->hasError())
 		return NULL;
 
-	return new Table(unit, emode, name, this, rowType_, rhType_);
+	return new Table(unit, name, this, rowType_, rhType_);
 }
 
 IndexType *TableType::findSubIndex(const string &name) const

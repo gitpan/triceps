@@ -1,5 +1,5 @@
 //
-// (C) Copyright 2011-2013 Sergey A. Babkin.
+// (C) Copyright 2011-2014 Sergey A. Babkin.
 // This file is a part of Triceps.
 // See the file COPYRIGHT for the copyright notice and license information
 //
@@ -52,9 +52,27 @@ getRow(WrapRowHandle *self)
 		clearErrMsg();
 		RowHandle *rh = self->get();
 
+		try { do {
+			if (rh == NULL) {
+				throw Exception::f("Triceps::RowHandle::getRow: RowHandle is NULL");
+			}
+		} while(0); } TRICEPS_CATCH_CROAK;
+
+		// XXX Should it check for row being NULL? C++ code can create that...
+		RETVAL = new WrapRow(const_cast<RowType *>(self->ref_.getTable()->getRowType()), const_cast<Row *>(rh->getRow()));
+	OUTPUT:
+		RETVAL
+
+WrapRow *
+getRowSafe(WrapRowHandle *self)
+	CODE:
+		// for casting of return value
+		static char CLASS[] = "Triceps::Row";
+		clearErrMsg();
+		RowHandle *rh = self->get();
+
 		if (rh == NULL) {
-			setErrMsg("Triceps::RowHandle::getRow: RowHandle is NULL");
-			XSRETURN_UNDEF;
+			XSRETURN_UNDEF; // not a croak!
 		}
 
 		// XXX Should it check for row being NULL? C++ code can create that...
@@ -68,12 +86,10 @@ isInTable(WrapRowHandle *self)
 		clearErrMsg();
 		RowHandle *rh = self->get();
 
-		if (rh == NULL) {
-			setErrMsg("Triceps::RowHandle::isInTable: RowHandle is NULL");
-			XSRETURN_UNDEF;
-		}
-
-		RETVAL = rh->isInTable();
+		if (rh == NULL)
+			RETVAL = 0;
+		else
+			RETVAL = rh->isInTable();
 	OUTPUT:
 		RETVAL
 

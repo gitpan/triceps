@@ -1,5 +1,5 @@
 #
-# (C) Copyright 2011-2013 Sergey A. Babkin.
+# (C) Copyright 2011-2014 Sergey A. Babkin.
 # This file is a part of Triceps.
 # See the file COPYRIGHT for the copyright notice and license information
 #
@@ -15,7 +15,7 @@
 use ExtUtils::testlib;
 
 use Test;
-BEGIN { plan tests => 150 };
+BEGIN { plan tests => 142 };
 use Triceps;
 ok(1); # If we made it this far, we're ok.
 
@@ -71,42 +71,20 @@ $tt1 = Triceps::TableType->new($rt1)
 ok(ref $tt1, "Triceps::TableType");
 
 # check with uninitialized type
-$t1 = $u1->makeTable($tt1, "EM_SCHEDULE", "tab1");
+$t1 = eval { $u1->makeTable($tt1, "tab1"); };
 ok(!defined $t1);
-ok($! . "", "Triceps::Unit::makeTable: table type was not successfully initialized");
+ok($@, qr/^Triceps::Unit::makeTable: table type was not successfully initialized at/);
 
 $res = $tt1->initialize();
 ok($res, 1);
-#print STDERR "$!" . "\n";
 
 ###################### makeTable #################################
 
-$t1 = $u1->makeTable($tt1, "EM_SCHEDULE", "tab1");
+$t1 = $u1->makeTable($tt1, "tab1");
 ok(ref $t1, "Triceps::Table");
-#print STDERR "$!" . "\n";
 
 $v = $t1->getUnit();
 ok($u1->same($v));
-
-$t1 = $u1->makeTable($tt1, "EM_FORK", "tab1");
-ok(ref $t1, "Triceps::Table");
-
-$t1 = $u1->makeTable($tt1, "EM_CALL", "tab1");
-ok(ref $t1, "Triceps::Table");
-
-$t1 = $u1->makeTable($tt1, "EM_IGNORE", "tab1");
-ok(ref $t1, "Triceps::Table");
-
-$t1 = $u1->makeTable($tt1, 0, "tab1");
-ok(ref $t1, "Triceps::Table");
-
-$t1 = $u1->makeTable($tt1, 0.0, "tab1");
-ok(!defined $t1);
-ok($! . "", "Triceps::Unit::makeTable: unknown enqueuing mode string '0', if integer was meant, it has to be cast");
-
-$t1 = $u1->makeTable($tt1, 20, "tab1");
-ok(!defined $t1);
-ok($! . "", "Triceps::Unit::makeTable: unknown enqueuing mode integer 20");
 
 ###################### makeTray #################################
 # see in Tray.t
@@ -293,7 +271,6 @@ ok($v);
 $history = "";
 $v = $u1->makeHashSchedule($xlab1, "OP_INSERT", @dataset1);
 ok($v);
-#print STDERR $! . "\n";
 $v = $u1->empty();
 ok(!$v);
 $u1->callNext();
@@ -304,7 +281,6 @@ ok($v);
 $history = "";
 $v = $u1->makeArraySchedule($xlab1, "OP_DELETE", @datavalues1);
 ok($v);
-#print STDERR $! . "\n";
 $v = $u1->empty();
 ok(!$v);
 $u1->callNext();
@@ -328,17 +304,20 @@ ok($history, "x xlab1 op=OP_DELETE row=[123, 456, 789, 3.14, text]\n");
 eval {
 	$v = $u1->makeHashSchedule($xlab1, "OP_INSET", @dataset1);
 };
-ok($@ =~ /^Triceps::Label::makeRowop: unknown opcode string 'OP_INSET', if integer was meant, it has to be cast/);
+ok($@, qr/^Triceps::Label::makeRowop: unknown opcode string 'OP_INSET', if integer was meant, it has to be cast/);
 
 eval {
 	$v = $u1->makeHashCall($xlab1, "OP_INSERT", zzz => 1);
 };
-ok($@ =~ /^Triceps::RowType::makeRowHash: attempting to set an unknown field 'zzz'/);
+ok($@, qr/^Triceps::RowType::makeRowHash: attempting to set an unknown field 'zzz'/);
 
 eval {
 	$v = $u1->makeArraySchedule(666, "OP_DELETE", @datavalues1);
 };
-ok($@ =~ /^Can't call method "makeRowopArray" without a package or object reference/);
+# Depending on the Perl version it's one of:
+#   Can't call method "makeRowopArray" without a package or object reference
+#   Can't locate object method "makeRowopArray" via package "666"
+ok($@, qr/^Can't .* method "makeRowopArray" /);
 
 #############################################################
 # test scheduling for error catching
@@ -353,7 +332,7 @@ $u1->schedule($erop);
 eval {
 	$u1->drainFrame();
 };
-ok($@ =~ /^an error in label handler at [^\n]*
+ok($@, qr/^an error in label handler at [^\n]*
 Detected in the unit 'u1' label 'elab1' execution handler.
 Called through the label 'elab1'. at/);
 
@@ -362,7 +341,7 @@ $xlab1->clear(); # now the label could not call anything any more
 eval {
 	$u1->call($rop11);
 };
-ok($@ =~ /Triceps::Unit::call: argument 1 is a Rowop for label xlab1 from a wrong unit \[label cleared\] at/);
+ok($@, qr/Triceps::Unit::call: argument 1 is a Rowop for label xlab1 from a wrong unit \[label cleared\] at/);
 ok($clearlog, "clear xlab1 args=[]\n");
 
 # errors from exception catching
@@ -375,7 +354,7 @@ ok(ref $recrop, "Triceps::Rowop");
 eval {
 	$u1->call($recrop);
 };
-ok($@ =~ /^Exceeded the unit recursion depth limit 1 \(attempted 2\) on the label 'reclab'. at [^\n]*
+ok($@, qr/^Exceeded the unit recursion depth limit 1 \(attempted 2\) on the label 'reclab'. at [^\n]*
 \tmain::__ANON__[^\n]*
 \teval[^\n]*
 Detected in the unit 'u1' label 'reclab' execution handler.
@@ -401,7 +380,7 @@ eval {
 	$u1->call($nrop5);
 };
 #print "$@\n";
-ok($@ =~ /^Test of a crash at [^\n]*
+ok($@, qr/^Test of a crash at [^\n]*
 Detected in the unit 'u1' label 'nlab1' execution handler.
 Called through the label 'nlab1'. at [^\n]*
 	main::__ANON__[^\n]*
@@ -435,7 +414,7 @@ ok($u1->maxRecursionDepth(), 3);
 eval {
 	$u1->call($recrop);
 };
-ok($@ =~ /^Exceeded the unit recursion depth limit 3 \(attempted 4\) on the label 'reclab'. at [^\n]*
+ok($@, qr/^Exceeded the unit recursion depth limit 3 \(attempted 4\) on the label 'reclab'. at [^\n]*
 \tmain::__ANON__[^\n]*
 \teval[^\n]*
 Detected in the unit 'u1' label 'reclab' execution handler.
@@ -461,7 +440,7 @@ eval {
 	$u1->call($recrop);
 };
 # There is always also the outermost frame, so the label recurses one less time.
-ok($@ =~ /^Unit 'u1' exceeded the stack depth limit 3, current depth 4, when calling the label 'reclab'. at [^\n]*
+ok($@, qr/^Unit 'u1' exceeded the stack depth limit 3, current depth 4, when calling the label 'reclab'. at [^\n]*
 \tmain::__ANON__[^\n]*
 \teval[^\n]*
 Detected in the unit 'u1' label 'reclab' execution handler.
@@ -479,11 +458,48 @@ $u1->setMaxStackDepth(0);
 $u1->setMaxRecursionDepth(1);
 
 #############################################################
+# Test the current frame emptiness.
+
+{
+	$f_u = Triceps::Unit->new("f_u");
+	ok($f_u->isInOuterFrame());
+	ok($f_u->isFrameEmpty());
+
+	my $f_protocol = "";
+
+	$f_dummy_lab = $f_u->makeDummyLabel($rt1, "f_dummy_lab");
+	$f_inner_lab = $f_u->makeLabel($rt1, "f_inner_lab", undef, sub {
+		$f_protocol .= sprintf("InOuter = %d\n", $f_u->isInOuterFrame());
+		$f_protocol .= sprintf("FrameEmpty = %d\n", $f_u->isFrameEmpty());
+
+		$f_u->schedule($f_dummy_lab->makeRowop("OP_INSERT", $row1));
+		$f_protocol .= sprintf("scheduled, FrameEmpty = %d\n", $f_u->isFrameEmpty());
+
+		$f_u->fork($f_dummy_lab->makeRowop("OP_INSERT", $row1));
+		$f_protocol .= sprintf("forked, FrameEmpty = %d\n", $f_u->isFrameEmpty());
+	});
+	$f_outer_lab = $f_u->makeLabel($rt1, "f_outer_lab", undef, sub {
+		$f_protocol .= sprintf("outer InOuter = %d\n", $f_u->isInOuterFrame());
+		$f_protocol .= sprintf("outer FrameEmpty = %d\n", $f_u->isFrameEmpty());
+		$f_u->call($f_inner_lab->makeRowop("OP_INSERT", $row1));
+	});
+	$f_u->call($f_outer_lab->makeRowop("OP_INSERT", $row1));
+
+	ok($f_protocol, 
+'outer InOuter = 0
+outer FrameEmpty = 1
+InOuter = 0
+FrameEmpty = 1
+scheduled, FrameEmpty = 1
+forked, FrameEmpty = 0
+');
+}
+
+#############################################################
 # tracer ops
 
 $v = $u1->getTracer();
 ok(! defined $v);
-ok($! . "", "");
 
 $trsn1 = Triceps::UnitTracerStringName->new();
 ok(ref $trsn1, "Triceps::UnitTracerStringName");
@@ -505,7 +521,6 @@ $u1->setTracer(undef);
 
 $v = $u1->getTracer();
 ok(! defined $v);
-ok($! . "", "");
 
 # try to set an invalid value
 eval {
@@ -671,7 +686,6 @@ ok($v, $s_expect);
 
 # check the buffer cleaning of string tracer
 $sntr->clearBuffer();
-ok($! . "", "");
 $v = $sntr->print();
 ok($v, "");
 
@@ -745,12 +759,9 @@ ok(ref $c_op1, "Triceps::Rowop");
 $c_op2 = $c_lab1->makeRowop(&Triceps::OP_DELETE, $row1);
 ok(ref $c_op2, "Triceps::Rowop");
 
-$v = $c_lab1->chain($c_lab2);
-ok($v);
-$v = $c_lab1->chain($c_lab3);
-ok($v);
-$v = $c_lab2->chain($c_lab3);
-ok($v);
+$c_lab1->chain($c_lab2);
+$c_lab1->chain($c_lab3);
+$c_lab2->chain($c_lab3);
 
 $u1->schedule($c_op1);
 $u1->schedule($c_op2);
@@ -788,6 +799,32 @@ $c_expect =
 	. "unit 'u1' after-chained label 'lab1' op OP_DELETE }\n"
 	. "unit 'u1' after label 'lab1' op OP_DELETE }\n"
 	;
+
+$v = $sntr->print();
+ok($v, $c_expect);
+
+### same chained input but with no-verbose
+
+$sntr = Triceps::UnitTracerStringName->new();
+$u1->setTracer($sntr);
+
+$u1->schedule($c_op1);
+$u1->schedule($c_op2);
+ok(!$u1->empty());
+
+$u1->drainFrame();
+ok($u1->empty());
+
+$c_expect =
+"unit 'u1' before label 'lab1' op OP_INSERT
+unit 'u1' before label 'lab2' (chain 'lab1') op OP_INSERT
+unit 'u1' before label 'lab3' (chain 'lab2') op OP_INSERT
+unit 'u1' before label 'lab3' (chain 'lab1') op OP_INSERT
+unit 'u1' before label 'lab1' op OP_DELETE
+unit 'u1' before label 'lab2' (chain 'lab1') op OP_DELETE
+unit 'u1' before label 'lab3' (chain 'lab2') op OP_DELETE
+unit 'u1' before label 'lab3' (chain 'lab1') op OP_DELETE
+";
 
 $v = $sntr->print();
 ok($v, $c_expect);

@@ -1,5 +1,5 @@
 //
-// (C) Copyright 2011-2013 Sergey A. Babkin.
+// (C) Copyright 2011-2014 Sergey A. Babkin.
 // This file is a part of Triceps.
 // See the file COPYRIGHT for the copyright notice and license information
 //
@@ -36,7 +36,7 @@ public:
 
 	// Copy this type, copying the contents but sharing the row types.
 	// The copy is also uninitialized. The errors will not be copied.
-	TableType *copy();
+	TableType *copy() const;
 
 	// Create a copy of the type, also copying all the contents including the row types.
 	// The copy is also uninitialized. The errors will not be copied.
@@ -65,6 +65,7 @@ public:
 	// Add a top-level index.
 	//
 	// May be used only until initialized. Afterwards will throw an Exception.
+	// If an Exception is thrown, tries to free the unreferenced (this).
 	//
 	// The index remembered is actually a copy of original, so all the settings
 	// need to be done before calling here. This also means that to access indexes
@@ -100,11 +101,10 @@ public:
 
 	// Create an instance table of this type.
 	// @param unit - unit where the table belongs
-	// @param emode - enqueueing mode for the rowops produced in the table
 	// @param name - name of the table,  the input label will be named name.in, the output label name.out,
 	//               and the aggregation labels will also be prefixed with the table name and a dot
 	// @return - new instance or NULL if not initialized or has an error
-	Onceref<Table> makeTable(Unit *unit, Gadget::EnqMode emode, const string &name) const;
+	Onceref<Table> makeTable(Unit *unit, const string &name) const;
 
 	// Find an index type by name.
 	// Works only after initialization.

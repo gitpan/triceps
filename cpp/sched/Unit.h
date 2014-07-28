@@ -1,5 +1,5 @@
 //
-// (C) Copyright 2011-2013 Sergey A. Babkin.
+// (C) Copyright 2011-2014 Sergey A. Babkin.
 // This file is a part of Triceps.
 // See the file COPYRIGHT for the copyright notice and license information
 //
@@ -280,8 +280,8 @@ public:
 		// The values go starting from 0 in before-after pairs
 		TW_BEFORE, // before calling the label's execution as such
 		TW_AFTER, // after all the execution is done
-		TW_BEFORE_CHAINED, // after execution, before calliong the chained labels (if they are present)
-		TW_AFTER_CHAINED, // after calliong the chained labels (if they were present)
+		TW_BEFORE_CHAINED, // after execution, before calling the chained labels (if they are present)
+		TW_AFTER_CHAINED, // after calling the chained labels (if they were present)
 		TW_BEFORE_DRAIN, // before draining the label's frame if it's not empty
 		TW_AFTER_DRAIN, // after draining the label's frame if was not empty
 		// XXX should there be events on enqueueing?
@@ -386,7 +386,7 @@ public:
 	class StringTracer : public Tracer
 	{
 	public:
-		// @param verbose - if true, record all the events, otherwise only the BEGIN records
+		// @param verbose - if true, record all the events, otherwise only the TW_BEFORE records
 		StringTracer(bool verbose = false, RowPrinter *rp = NULL);
 
 		// from Tracer
@@ -401,7 +401,7 @@ public:
 	class StringNameTracer : public StringTracer
 	{
 	public:
-		// @param verbose - if true, record all the events, otherwise only the BEGIN records
+		// @param verbose - if true, record all the events, otherwise only the TW_BEFORE records
 		StringNameTracer(bool verbose = false, RowPrinter *rp = NULL);
 
 		// from Tracer

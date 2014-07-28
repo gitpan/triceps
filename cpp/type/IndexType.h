@@ -1,5 +1,5 @@
 //
-// (C) Copyright 2011-2013 Sergey A. Babkin.
+// (C) Copyright 2011-2014 Sergey A. Babkin.
 // This file is a part of Triceps.
 // See the file COPYRIGHT for the copyright notice and license information
 //
@@ -181,7 +181,7 @@ public:
 	// Get the list of field names that this index uses as keys.
 	// May be NULL if the index has no keys at all or if the key is
 	// calculated as some expression on the fields.
-	virtual const_Onceref<NameSet> getKey() const = 0;
+	virtual const NameSet *getKey() const = 0;
 
 	// Define an aggregator on this index. Each aggregator instance
 	// will work on the instance of this index.

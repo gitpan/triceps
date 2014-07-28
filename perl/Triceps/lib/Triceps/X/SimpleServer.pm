@@ -1,5 +1,5 @@
 #
-# (C) Copyright 2011-2013 Sergey A. Babkin.
+# (C) Copyright 2011-2014 Sergey A. Babkin.
 # This file is a part of Triceps.
 # See the file COPYRIGHT for the copyright notice and license information
 #
@@ -12,7 +12,7 @@ package Triceps::X::SimpleServer;
 
 sub CLONE_SKIP { 1; }
 
-our $VERSION = 'v1.0.93';
+our $VERSION = 'v2.0.0';
 
 use Carp;
 use Errno qw(EINTR EAGAIN);
@@ -55,18 +55,19 @@ our $srv_exit; # exit when all the client connections are closed
 # Writing to the output buffers. Will also trigger the polling to
 # actually send the output data to the client's socket.
 #
-# XXX A caveat is that if the client had already disconnected, this
-# will create all kinds of mess.
-#
 # @param id - the client id, as generated on the client connection
+#        (if the client already disconnected, this call will 
+#        have no effect)
 # @param string - the string to write
 sub outBuf # ($id, $string)
 {
 	my $id = shift;
 	my $line = shift;
-	$outbufs{$id} .= $line;
-	# If there is anything to write on a buffer, stop reading from it.
-	$poll->mask($clients{$id} => POLLOUT);
+	if (exists $clients{$id}) {
+		$outbufs{$id} .= $line;
+		# If there is anything to write on a buffer, stop reading from it.
+		$poll->mask($clients{$id} => POLLOUT);
+	}
 }
 
 # Write to the output buffer of the current client (as set in $cur_cli
@@ -301,16 +302,21 @@ sub makeExitLabel # ($unit, $name)
 #
 # @param fromLabel - the new label will be chained to this one and get the
 #        data from it
+# @param printName - if present, overrides the label name printed
 # @return - the newly created label object
-sub makeServerOutLabel # ($fromLabel)
+sub makeServerOutLabel # ($fromLabel [, $printName])
 {
 	no warnings; # or in tests prints a lot of warnings about undefs
 	my $fromLabel = shift;
+	my $printName = shift;
 	my $unit = $fromLabel->getUnit();
 	my $fromName = $fromLabel->getName();
+	if (!$printName) {
+		$printName = $fromName;
+	}
 	my $lbOut = $unit->makeLabel($fromLabel->getType(), 
 		$fromName . ".serverOut", undef, sub {
-			&outCurBuf(join(",", $fromName, 
+			&outCurBuf(join(",", $printName, 
 				&Triceps::opcodeString($_[1]->getOpcode()),
 				$_[1]->getRow()->toArray()) . "\n");
 		});

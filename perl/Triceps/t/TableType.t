@@ -1,5 +1,5 @@
 #
-# (C) Copyright 2011-2013 Sergey A. Babkin.
+# (C) Copyright 2011-2014 Sergey A. Babkin.
 # This file is a part of Triceps.
 # See the file COPYRIGHT for the copyright notice and license information
 #
@@ -15,7 +15,7 @@
 use ExtUtils::testlib;
 
 use Test;
-BEGIN { plan tests => 104 };
+BEGIN { plan tests => 105 };
 use Triceps;
 ok(1); # If we made it this far, we're ok.
 
@@ -63,9 +63,9 @@ ok(ref $tt2, "Triceps::TableType");
 ok($tt2->same($tt1));
 
 # a copy of the index is added, the original is left unchanged
-$res = $it1->getTabtype();
+$res = eval { $it1->getTabtype(); };
 ok(!defined $res);
-ok($! . "", "Triceps::IndexType::getTabtype: this index type does not belong to an initialized table type");
+ok($@, qr/^Triceps::IndexType::getTabtype: this index type does not belong to an initialized table type/);
 
 $tt3 = Triceps::TableType->new($rt1)
 	->addSubIndex("primary", $it1);
@@ -158,9 +158,9 @@ $res = $it2->print();
 ok($res, "index FifoIndex()");
 
 # until the table type is initialized, indexes still don't know about it...
-$res = $it2->getTabtype();
+$res = eval { $it2->getTabtype(); };
 ok(!defined $res);
-ok($! . "", "Triceps::IndexType::getTabtype: this index type does not belong to an initialized table type");
+ok($@, qr/^Triceps::IndexType::getTabtype: this index type does not belong to an initialized table type/);
 
 $it2 = $tt1->findSubIndex("primary");
 $res = $it2->print();
@@ -168,7 +168,11 @@ ok($res, "index HashedIndex(b, c, ) {\n  index FifoIndex() fifo,\n}");
 $res = $it2->print(undef);
 ok($res, "index HashedIndex(b, c, ) { index FifoIndex() fifo, }");
 
-$it2 = $tt1->findSubIndex("xxx");
+$it2 = eval { $tt1->findSubIndex("xxx"); };
+ok(!defined($it2));
+ok($@, qr/^Triceps::TableType::findSubIndex: unknown nested index 'xxx' at/);
+
+$it2 = $tt1->findSubIndexSafe("xxx");
 ok(!defined($it2));
 
 $it2 = $tt1->findSubIndexById("IT_FIFO");
@@ -177,21 +181,22 @@ ok(ref $it2, "Triceps::IndexType");
 $it2 = $tt1->findSubIndexById(&Triceps::IT_FIFO);
 ok(ref $it2, "Triceps::IndexType");
 
-$it2 = $tt1->findSubIndexById(&Triceps::IT_ROOT);
+$it2 = eval { $tt1->findSubIndexById(&Triceps::IT_ROOT); };
 ok(!defined $it2);
-ok($! . "", "Triceps::TableType::findSubIndexById: no nested index with type id 'IT_ROOT' (0)");
+ok($@, qr/^Triceps::TableType::findSubIndexById: no nested index with type id 'IT_ROOT' \(0\)/);
 
-$it2 = $tt1->findSubIndexById(999);
+$it2 = eval { $tt1->findSubIndexById(999); };
 ok(!defined $it2);
-ok($! . "", "Triceps::TableType::findSubIndexById: no nested index with type id '???' (999)");
+ok($@, qr/^Triceps::TableType::findSubIndexById: no nested index with type id '\?\?\?' \(999\)/);
 
-$it2 = $tt1->findSubIndexById("xxx");
+$it2 = eval { $tt1->findSubIndexById("xxx"); };
 ok(!defined $it2);
-ok($! . "", "Triceps::TableType::findSubIndexById: unknown IndexId string 'xxx', if integer was meant, it has to be cast");
+ok($@, qr/^Triceps::TableType::findSubIndexById: unknown IndexId string 'xxx', if integer was meant, it has to be cast/);
 
 $tt4 = Triceps::TableType->new($rt1);
-$it2 = $tt4->getFirstLeaf();
+$it2 = eval { $tt4->getFirstLeaf(); };
 ok(!defined($it2));
+ok($@, qr/^Triceps::TableType::getFirstLeaf: table type has no indexes defined at/);
 
 $it2 = $tt1->findIndexPath("primary", "fifo");
 $res = $it2->print();
@@ -366,7 +371,6 @@ ok($res, 0);
 
 $res = $tt1->initialize();
 ok($res, 1);
-ok($! . "", "");
 
 $res = $tt1->isInitialized();
 ok($res, 1);
@@ -374,7 +378,6 @@ ok($res, 1);
 # repeated initialization is OK
 $res = $tt1->initialize();
 ok($res, 1);
-ok($! . "", "");
 
 # check that still can find indexes
 $it2 = $tt1->getFirstLeaf();
@@ -386,9 +389,9 @@ ok(ref $res, "Triceps::TableType");
 ok($tt1->same($res));
 
 # adding indexes is not allowed any more
-$res = $tt1->addSubIndex("second", Triceps::IndexType->newFifo());
+$res = eval { $tt1->addSubIndex("second", Triceps::IndexType->newFifo()); };
 ok(!defined $res);
-ok($! . "", "Triceps::TableType::addSubIndex: table is already initialized, can not add indexes any more");
+ok($@, qr/^Triceps::TableType::addSubIndex: table is already initialized, can not add indexes any more/);
 
 ###################### copy ###########################################
 

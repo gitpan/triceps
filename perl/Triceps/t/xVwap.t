@@ -1,5 +1,5 @@
 #
-# (C) Copyright 2011-2013 Sergey A. Babkin.
+# (C) Copyright 2011-2014 Sergey A. Babkin.
 # This file is a part of Triceps.
 # See the file COPYRIGHT for the copyright notice and license information
 #
@@ -156,7 +156,7 @@ ok(ref $ttAggr1, "Triceps::TableType");
 $res = $ttAggr1->initialize();
 ok($res, 1);
 
-$tAggr1 = $vu1->makeTable($ttAggr1, &Triceps::EM_FORK, "tAggr1");
+$tAggr1 = $vu1->makeTable($ttAggr1, "tAggr1");
 ok(ref $tAggr1, "Triceps::Table");
 
 # the label that processes the results of aggregation
@@ -284,10 +284,9 @@ sub new # (class, optionName => optionValue ...)
 				->setAggregator($agtype)
 			)
 		);
-	$tabtype->initialize() or Carp::confess "Failed to initialize the VWAP table type: $!";
+	$tabtype->initialize();
 	$self->{tabType} = $tabtype;
-	my $t = $self->{unit}->makeTable($tabtype, &Triceps::EM_CALL, $self->{name} . ".agg");
-	Carp::confess "Failed to create the VWAP table: $!" unless (ref $t eq "Triceps::Table");
+	my $t = $self->{unit}->makeTable($tabtype, $self->{name} . ".agg");
 	$self->{table} = $t;
 
 	bless $self, $class;
@@ -378,7 +377,7 @@ my $rtTrade = Triceps::RowType->new(
 	symbol => "string", # symbol traded
 	price => "float64",
 	size => "float64", # number of shares traded
-) or confess "$!";
+);
 
 my $ttWindow = Triceps::TableType->new($rtTrade)
 	->addSubIndex("byId", 
@@ -388,7 +387,7 @@ my $ttWindow = Triceps::TableType->new($rtTrade)
 		Triceps::IndexType->newHashed(key => [ "symbol" ])
 		->addSubIndex("fifo", Triceps::IndexType->newFifo())
 	)
-or confess "$!";
+;
 
 # the aggregation result
 my $rtVwap;
@@ -409,15 +408,14 @@ Triceps::SimpleAggregator::make(
 	saveComputeTo => \$compText,
 );
 
-$ttWindow->initialize() or confess "$!";
-my $tWindow = $uTrades->makeTable($ttWindow, 
-	&Triceps::EM_CALL, "tWindow") or confess "$!";
+$ttWindow->initialize();
+my $tWindow = $uTrades->makeTable($ttWindow, "tWindow");
 
 # label to print the result of aggregation
 my $lbPrint = $uTrades->makeLabel($rtVwap, "lbPrint",
 	undef, sub { # (label, rowop)
 		&send($_[1]->printP(), "\n");
-	}) or confess "$!";
+	});
 $tWindow->getAggregatorLabel("aggrVwap")->chain($lbPrint);
 
 while(&readLine) {

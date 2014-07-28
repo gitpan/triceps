@@ -1,5 +1,5 @@
 //
-// (C) Copyright 2011-2013 Sergey A. Babkin.
+// (C) Copyright 2011-2014 Sergey A. Babkin.
 // This file is a part of Triceps.
 // See the file COPYRIGHT for the copyright notice and license information
 //
@@ -60,7 +60,7 @@ UTESTCASE preLabel(Utest *utest)
 	UT_ASSERT(tt->getErrors().isNull());
 	UT_ASSERT(!tt->getErrors()->hasError());
 
-	Autoref<Table> t = tt->makeTable(unit, Table::EM_CALL, "t");
+	Autoref<Table> t = tt->makeTable(unit, "t");
 	UT_ASSERT(!t.isNull());
 	UT_ASSERT(t->getInputLabel() != NULL);
 	UT_ASSERT(t->getPreLabel() != NULL);
@@ -245,7 +245,7 @@ UTESTCASE exceptions(Utest *utest)
 	UT_ASSERT(tt->getErrors().isNull());
 	UT_ASSERT(!tt->getErrors()->hasError());
 
-	Autoref<Table> t = tt->makeTable(unit, Table::EM_CALL, "t");
+	Autoref<Table> t = tt->makeTable(unit, "t");
 	UT_ASSERT(!t.isNull());
 
 	bool throwPre = false, throwOut = false;
@@ -443,7 +443,7 @@ UTESTCASE groupSize(Utest *utest)
 	Autoref<IndexType> bcixt = tt->findSubIndex("bc");
 	UT_ASSERT(bcixt);
 
-	Autoref<Table> t = tt->makeTable(unit, Table::EM_CALL, "t");
+	Autoref<Table> t = tt->makeTable(unit, "t");
 	UT_ASSERT(!t.isNull());
 
 	FdataVec dv;
@@ -512,7 +512,7 @@ UTESTCASE clear(Utest *utest)
 		->addSubIndex("fifo", new FifoIndexType())
 	);
 
-	Autoref<Table> t = tt->makeTable(unit, Table::EM_CALL, "t");
+	Autoref<Table> t = tt->makeTable(unit, "t");
 	UT_ASSERT(!t.isNull());
 
 	FdataVec dv;
@@ -555,7 +555,7 @@ UTESTCASE dumpAll(Utest *utest)
 
 	Autoref<IndexType> idx = tt->getFirstLeaf();
 
-	Autoref<Table> t = tt->makeTable(unit, Table::EM_CALL, "t");
+	Autoref<Table> t = tt->makeTable(unit, "t");
 	UT_ASSERT(!t.isNull());
 
 	FdataVec dv;
@@ -619,7 +619,7 @@ UTESTCASE inputRef(Utest *utest)
 		->addSubIndex("fifo", new FifoIndexType())
 	);
 
-	Autoref<Table> t = tt->makeTable(unit, Table::EM_CALL, "t");
+	Autoref<Table> t = tt->makeTable(unit, "t");
 	UT_ASSERT(!t.isNull());
 
 	Autoref<Label> lbin = t->getInputLabel();

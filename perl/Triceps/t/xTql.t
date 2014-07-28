@@ -1,5 +1,5 @@
 #
-# (C) Copyright 2011-2013 Sergey A. Babkin.
+# (C) Copyright 2011-2014 Sergey A. Babkin.
 # This file is a part of Triceps.
 # See the file COPYRIGHT for the copyright notice and license information
 #
@@ -33,7 +33,7 @@ our $rtTrade = Triceps::RowType->new(
 	symbol => "string", # symbol traded
 	price => "float64",
 	size => "float64", # number of shares traded
-) or confess "$!";
+);
 
 our $ttWindow = Triceps::TableType->new($rtTrade)
 	->addSubIndex("bySymbol", 
@@ -42,22 +42,22 @@ our $ttWindow = Triceps::TableType->new($rtTrade)
 				Triceps::IndexType->newFifo(limit => 2)
 			)
 	)
-	or confess "$!";
-$ttWindow->initialize() or confess "$!";
+;
+$ttWindow->initialize();
 
 # Represents the static information about a company.
 our $rtSymbol = Triceps::RowType->new(
 	symbol => "string", # symbol name
 	name => "string", # the official company name
 	eps => "float64", # last quarter earnings per share
-) or confess "$!";
+);
 
 our $ttSymbol = Triceps::TableType->new($rtSymbol)
 	->addSubIndex("bySymbol", 
 		Triceps::IndexType->newHashed(key => [ "symbol" ])
 	)
-	or confess "$!";
-$ttSymbol->initialize() or confess "$!";
+;
+$ttSymbol->initialize();
 
 ################################################################
 # The Tql object built in one call.
@@ -66,10 +66,8 @@ sub runTqlQuery1
 {
 
 my $uTrades = Triceps::Unit->new("uTrades");
-my $tWindow = $uTrades->makeTable($ttWindow, "EM_CALL", "tWindow")
-	or confess "$!";
-my $tSymbol = $uTrades->makeTable($ttSymbol, "EM_CALL", "tSymbol")
-	or confess "$!";
+my $tWindow = $uTrades->makeTable($ttWindow, "tWindow");
+my $tSymbol = $uTrades->makeTable($ttSymbol, "tSymbol");
 
 # The information about tables, for querying.
 my $tql = Triceps::X::Tql->new(
@@ -86,6 +84,7 @@ $dispatch{$tSymbol->getName()} = $tSymbol->getInputLabel();
 $dispatch{"query"} = sub { $tql->query(@_); };
 $dispatch{"exit"} = \&Triceps::X::SimpleServer::exitFunc;
 
+# calls Triceps::X::SimpleServer::startServer(0, \%dispatch);
 Triceps::X::DumbClient::run(\%dispatch);
 };
 
@@ -113,22 +112,22 @@ my $expectQuery1 =
 > query,{read table tWindow} {join table tSymbol rightIdxPath bySymbol byLeft {symbol}}
 > query,{read table tWindow} {join table tSymbol byLeft {symbol}}
 > query,{read table tWindow} {where istrue {$%price == 20}}
-lb1read OP_INSERT symbol="AAA" name="Absolute Auto Analytics Inc" eps="0.5" 
-+EOD,OP_NOP,lb1read
-lb2project,OP_INSERT,AAA,20
-lb2project,OP_INSERT,AAA,30
-+EOD,OP_NOP,lb2project
-lb2project OP_INSERT symbol="AAA" price="20" 
-lb2project OP_INSERT symbol="AAA" price="30" 
-+EOD,OP_NOP,lb2project
-join2.out OP_INSERT id="3" symbol="AAA" price="20" size="20" name="Absolute Auto Analytics Inc" eps="0.5" 
-join2.out OP_INSERT id="5" symbol="AAA" price="30" size="30" name="Absolute Auto Analytics Inc" eps="0.5" 
-+EOD,OP_NOP,join2.out
-join2.out OP_INSERT id="3" symbol="AAA" price="20" size="20" name="Absolute Auto Analytics Inc" eps="0.5" 
-join2.out OP_INSERT id="5" symbol="AAA" price="30" size="30" name="Absolute Auto Analytics Inc" eps="0.5" 
-+EOD,OP_NOP,join2.out
-lb2where OP_INSERT id="3" symbol="AAA" price="20" size="20" 
-+EOD,OP_NOP,lb2where
+query OP_INSERT symbol="AAA" name="Absolute Auto Analytics Inc" eps="0.5" 
++EOD,OP_NOP,query
+query,OP_INSERT,AAA,20
+query,OP_INSERT,AAA,30
++EOD,OP_NOP,query
+query OP_INSERT symbol="AAA" price="20" 
+query OP_INSERT symbol="AAA" price="30" 
++EOD,OP_NOP,query
+query OP_INSERT id="3" symbol="AAA" price="20" size="20" name="Absolute Auto Analytics Inc" eps="0.5" 
+query OP_INSERT id="5" symbol="AAA" price="30" size="30" name="Absolute Auto Analytics Inc" eps="0.5" 
++EOD,OP_NOP,query
+query OP_INSERT id="3" symbol="AAA" price="20" size="20" name="Absolute Auto Analytics Inc" eps="0.5" 
+query OP_INSERT id="5" symbol="AAA" price="30" size="30" name="Absolute Auto Analytics Inc" eps="0.5" 
++EOD,OP_NOP,query
+query OP_INSERT id="3" symbol="AAA" price="20" size="20" 
++EOD,OP_NOP,query
 ';
 
 setInputLines(@inputQuery1);
@@ -144,10 +143,8 @@ sub runTqlQuery2
 {
 
 my $uTrades = Triceps::Unit->new("uTrades");
-my $tWindow = $uTrades->makeTable($ttWindow, "EM_CALL", "tWindow")
-	or confess "$!";
-my $tSymbol = $uTrades->makeTable($ttSymbol, "EM_CALL", "tSymbol")
-	or confess "$!";
+my $tWindow = $uTrades->makeTable($ttWindow, "tWindow");
+my $tSymbol = $uTrades->makeTable($ttSymbol, "tSymbol");
 
 # The information about tables, for querying.
 my $tql = Triceps::X::Tql->new(name => "tql");
@@ -191,16 +188,16 @@ my $expectQuery2 =
 > query,{read table tWindow}
 > query,{read table symbol}
 > query,{read table window}
-lb1read OP_INSERT symbol="AAA" name="Absolute Auto Analytics Inc" eps="0.5" 
-+EOD,OP_NOP,lb1read
-lb1read OP_INSERT id="3" symbol="AAA" price="20" size="20" 
-lb1read OP_INSERT id="5" symbol="AAA" price="30" size="30" 
-+EOD,OP_NOP,lb1read
-lb1read OP_INSERT symbol="AAA" name="Absolute Auto Analytics Inc" eps="0.5" 
-+EOD,OP_NOP,lb1read
-lb1read OP_INSERT id="3" symbol="AAA" price="20" size="20" 
-lb1read OP_INSERT id="5" symbol="AAA" price="30" size="30" 
-+EOD,OP_NOP,lb1read
+query OP_INSERT symbol="AAA" name="Absolute Auto Analytics Inc" eps="0.5" 
++EOD,OP_NOP,query
+query OP_INSERT id="3" symbol="AAA" price="20" size="20" 
+query OP_INSERT id="5" symbol="AAA" price="30" size="30" 
++EOD,OP_NOP,query
+query OP_INSERT symbol="AAA" name="Absolute Auto Analytics Inc" eps="0.5" 
++EOD,OP_NOP,query
+query OP_INSERT id="3" symbol="AAA" price="20" size="20" 
+query OP_INSERT id="5" symbol="AAA" price="30" size="30" 
++EOD,OP_NOP,query
 ';
 
 setInputLines(@inputQuery2);
@@ -216,10 +213,8 @@ sub runTqlQuery3
 {
 
 my $uTrades = Triceps::Unit->new("uTrades");
-my $tWindow = $uTrades->makeTable($ttWindow, "EM_CALL", "tWindow")
-	or confess "$!";
-my $tSymbol = $uTrades->makeTable($ttSymbol, "EM_CALL", "tSymbol")
-	or confess "$!";
+my $tWindow = $uTrades->makeTable($ttWindow, "tWindow");
+my $tSymbol = $uTrades->makeTable($ttSymbol, "tSymbol");
 
 # The information about tables, for querying.
 my $tql = Triceps::X::Tql->new(

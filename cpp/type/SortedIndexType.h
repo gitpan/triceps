@@ -1,5 +1,5 @@
 //
-// (C) Copyright 2011-2013 Sergey A. Babkin.
+// (C) Copyright 2011-2014 Sergey A. Babkin.
 // This file is a part of Triceps.
 // See the file COPYRIGHT for the copyright notice and license information
 //
@@ -106,7 +106,7 @@ public:
 	// conditions would not have any row types nor any Perl snippets.
 	//
 	// If redefined, the typical implementation is like this:
-	// IndexType *MySortCondition::copy(HoldRowTypes *holder) const
+	// IndexType *MySortCondition::deepCopy(HoldRowTypes *holder) const
 	// {
 	//     return new MySortCondition(*this, holder);
 	// }
@@ -123,7 +123,7 @@ public:
 	// if it's known. If unknown, may return NULL.
 	// The default implementation returns NULL.
 	// XXX add API to rememeber the keys in this object
-	virtual const_Onceref<NameSet> getKey() const;
+	virtual const NameSet *getKey() const;
 	
 	// If defining your own subclass of TreeIndexType::BasicRhSection, 
 	// return its size here.
@@ -209,7 +209,7 @@ public:
 	virtual void printTo(string &res, const string &indent = "", const string &subindent = "  ") const;
 
 	// from IndexType
-	virtual const_Onceref<NameSet> getKey() const;
+	virtual const NameSet *getKey() const;
 	virtual IndexType *copy(bool flat = false) const;
 	virtual IndexType *deepCopy(HoldRowTypes *holder) const;
 	virtual void initialize();

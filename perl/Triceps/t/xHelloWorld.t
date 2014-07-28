@@ -1,5 +1,5 @@
 #
-# (C) Copyright 2011-2013 Sergey A. Babkin.
+# (C) Copyright 2011-2014 Sergey A. Babkin.
 # This file is a part of Triceps.
 # See the file COPYRIGHT for the copyright notice and license information
 #
@@ -28,16 +28,16 @@ ok(1); # If we made it this far, we're ok.
 
 #########################
 
-$hwunit = Triceps::Unit->new("hwunit") or confess "$!";
+$hwunit = Triceps::Unit->new("hwunit");
 $hw_rt = Triceps::RowType->new(
 	greeting => "string",
 	address => "string",
-) or confess "$!";
+);
 
 my $print_greeting = $hwunit->makeLabel($hw_rt, "print_greeting", undef, sub { 
 	my ($label, $rowop) = @_;
 	&sendf("%s!\n", join(', ', $rowop->getRow()->toArray()));
-} ) or confess "$!";
+} );
 
 setInputLines();
 $hwunit->call($print_greeting->makeRowop(&Triceps::OP_INSERT, 
@@ -45,7 +45,7 @@ $hwunit->call($print_greeting->makeRowop(&Triceps::OP_INSERT,
 		greeting => "Hello",
 		address => "world",
 	)
-)) or confess "$!";
+));
 
 #print &getResultLines();
 ok(&getResultLines(), "Hello, world!\n");

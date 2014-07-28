@@ -1,5 +1,5 @@
 //
-// (C) Copyright 2011-2013 Sergey A. Babkin.
+// (C) Copyright 2011-2014 Sergey A. Babkin.
 // This file is a part of Triceps.
 // See the file COPYRIGHT for the copyright notice and license information
 //
@@ -194,6 +194,7 @@ IndexType::~IndexType()
 IndexType *IndexType::addSubIndex(const string &name, Onceref<IndexType> index)
 {
 	if (initialized_) {
+		Autoref<IndexType> cleaner = this;
 		throw Exception::fTrace("Attempted to add a sub-index '%s' to an initialized index type", name.c_str());
 	}
 	if (index.isNull())
@@ -206,6 +207,7 @@ IndexType *IndexType::addSubIndex(const string &name, Onceref<IndexType> index)
 IndexType *IndexType::setAggregator(Onceref<AggregatorType> agg)
 {
 	if (initialized_) {
+		Autoref<IndexType> cleaner = this;
 		throw Exception::fTrace("Attempted to set an aggregator on an initialized index type");
 	}
 	if (agg.isNull())

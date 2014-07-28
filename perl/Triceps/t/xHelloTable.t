@@ -1,5 +1,5 @@
 #
-# (C) Copyright 2011-2013 Sergey A. Babkin.
+# (C) Copyright 2011-2014 Sergey A. Babkin.
 # This file is a part of Triceps.
 # See the file COPYRIGHT for the copyright notice and license information
 #
@@ -31,20 +31,20 @@ ok(1); # If we made it this far, we're ok.
 
 sub helloWorldDirect()
 {
-	my $hwunit = Triceps::Unit->new("hwunit") or confess "$!";
+	my $hwunit = Triceps::Unit->new("hwunit");
 	my $rtCount = Triceps::RowType->new(
 		address => "string",
 		count => "int32",
-	) or confess "$!";
+	);
 
 	my $ttCount = Triceps::TableType->new($rtCount)
 		->addSubIndex("byAddress", 
 			Triceps::IndexType->newHashed(key => [ "address" ])
 		)
-	or confess "$!";
-	$ttCount->initialize() or confess "$!";
+	;
+	$ttCount->initialize();
 
-	my $tCount = $hwunit->makeTable($ttCount, &Triceps::EM_CALL, "tCount") or confess "$!";
+	my $tCount = $hwunit->makeTable($ttCount, "tCount");
 
 	while(&readLine) {
 		chomp;
@@ -63,7 +63,7 @@ sub helloWorldDirect()
 			my $new = $rtCount->makeRowHash(
 				address => $data[1],
 				count => $cnt+1,
-			) or confess "$!";
+			);
 			$tCount->insert($new);
 		} elsif ($data[0] =~ /^count$/i) {
 			&send("Received '", $data[1], "' ", $cnt + 0, " times\n");
@@ -171,7 +171,6 @@ sub new # (class, unit, args of makeTable...)
 	my $class = shift;
 	my $unit = shift;
 	my $self = $unit->makeTable(@_);
-	return undef unless defined $self;
 	bless $self, $class;
 	return $self;
 }
@@ -179,20 +178,20 @@ sub new # (class, unit, args of makeTable...)
 package main;
 
 {
-	my $hwunit = Triceps::Unit->new("hwunit") or confess "$!";
+	my $hwunit = Triceps::Unit->new("hwunit");
 	my $rtCount = Triceps::RowType->new(
 		address => "string",
 		count => "int32",
-	) or confess "$!";
+	);
 
 	my $ttCount = Triceps::TableType->new($rtCount)
 		->addSubIndex("byAddress", 
 			Triceps::IndexType->newHashed(key => [ "address" ])
 		)
-	or confess "$!";
-	$ttCount->initialize() or confess "$!";
+	;
+	$ttCount->initialize();
 
-	my $tCount = MyTable->new($hwunit, $ttCount, &Triceps::EM_CALL, "tCount") or confess "$!";
+	my $tCount = MyTable->new($hwunit, $ttCount, "tCount");
 	ok(ref $tCount, "MyTable");
 }
 
@@ -201,20 +200,20 @@ package main;
 
 sub helloWorldLabels()
 {
-	my $hwunit = Triceps::Unit->new("hwunit") or confess "$!";
+	my $hwunit = Triceps::Unit->new("hwunit");
 	my $rtCount = Triceps::RowType->new(
 		address => "string",
 		count => "int32",
-	) or confess "$!";
+	);
 
 	my $ttCount = Triceps::TableType->new($rtCount)
 		->addSubIndex("byAddress", 
 			Triceps::IndexType->newHashed(key => [ "address" ])
 		)
-	or confess "$!";
-	$ttCount->initialize() or confess "$!";
+	;
+	$ttCount->initialize();
 
-	my $tCount = $hwunit->makeTable($ttCount, "EM_CALL", "tCount") or confess "$!";
+	my $tCount = $hwunit->makeTable($ttCount, "tCount");
 
 	my $lbPrintCount = $hwunit->makeLabel($tCount->getRowType(),
 		"lbPrintCount", undef, sub { # (label, rowop)
@@ -222,7 +221,7 @@ sub helloWorldLabels()
 			my $row = $rowop->getRow();
 			&send(&Triceps::opcodeString($rowop->getOpcode), " '", 
 				$row->get("address"), "', count ", $row->get("count"), "\n");
-		} ) or confess "$!";
+		} );
 	$tCount->getOutputLabel()->chain($lbPrintCount);
 
 	# the updates will be sent here, for the tables to process

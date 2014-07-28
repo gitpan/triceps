@@ -1,5 +1,5 @@
 #
-# (C) Copyright 2011-2013 Sergey A. Babkin.
+# (C) Copyright 2011-2014 Sergey A. Babkin.
 # This file is a part of Triceps.
 # See the file COPYRIGHT for the copyright notice and license information
 #
@@ -52,33 +52,31 @@ sub appCoreT # (@opts)
 		symbol => "string", # symbol traded
 		price => "float64",
 		size => "float64", # number of shares traded
-	) or confess "$!";
+	);
 
 	my $ttWindow = Triceps::TableType->new($rtTrade)
 		->addSubIndex("byId", 
 			Triceps::SimpleOrderedIndex->new(id => "ASC")
 		)
-		or confess "$!";
-	$ttWindow->initialize() or confess "$!";
+	;
+	$ttWindow->initialize();
 
 	# Represents the static information about a company.
 	my $rtSymbol = Triceps::RowType->new(
 		symbol => "string", # symbol name
 		name => "string", # the official company name
 		eps => "float64", # last quarter earnings per share
-	) or confess "$!";
+	);
 
 	my $ttSymbol = Triceps::TableType->new($rtSymbol)
 		->addSubIndex("bySymbol", 
 			Triceps::SimpleOrderedIndex->new(symbol => "ASC")
 		)
-		or confess "$!";
-	$ttSymbol->initialize() or confess "$!";
+	;
+	$ttSymbol->initialize();
 
-	my $tWindow = $unit->makeTable($ttWindow, "EM_CALL", "tWindow")
-		or confess "$!";
-	my $tSymbol = $unit->makeTable($ttSymbol, "EM_CALL", "tSymbol")
-		or confess "$!";
+	my $tWindow = $unit->makeTable($ttWindow, "tWindow");
+	my $tSymbol = $unit->makeTable($ttSymbol, "tSymbol");
 
 	# $tSymbol->getOutputLabel()->makeChained("dbgSymbol", undef, sub {
 		# print "XXX ", $_[1]->printP(), "\n";
@@ -422,7 +420,7 @@ c1|__EOF__
 		symbol => "string", # symbol traded
 		price => "float64",
 		size => "float64", # number of shares traded
-	) or confess "$!";
+	);
 
 	my $lb1 = $uTrades->makeDummyLabel($rtTrade, "lb1");
 	my $lb2 = $uTrades->makeDummyLabel($rtTrade, "lb2");

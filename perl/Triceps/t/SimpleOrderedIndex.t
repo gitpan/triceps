@@ -1,5 +1,5 @@
 #
-# (C) Copyright 2011-2013 Sergey A. Babkin.
+# (C) Copyright 2011-2014 Sergey A. Babkin.
 # This file is a part of Triceps.
 # See the file COPYRIGHT for the copyright notice and license information
 #
@@ -77,7 +77,7 @@ ok(ref $rt1, "Triceps::RowType");
 	$res = $tt1->initialize();
 	ok($res);
 
-	my $t1 = $u1->makeTable($tt1, "EM_CALL", "t1");
+	my $t1 = $u1->makeTable($tt1, "t1");
 	ok(ref $t1, "Triceps::Table");
 
 	# make some records and stick them in, put pseudo-numeric values into the strings
@@ -134,23 +134,22 @@ ok(ref $rt1, "Triceps::RowType");
 			)
 		);
 	ok(ref $tt1, "Triceps::TableType");
-	$res = $tt1->initialize();
+	$res = eval { $tt1->initialize(); };
 	ok(!defined $res);
-	#print "$!\n";
-	ok("$!", 
-"index error:
+	ok($@, 
+qr/^index error:
   nested index 1 'sorted':
     unknown direction 'XASC' for field 'z', use 'ASC' or 'DESC'
     no field 'z' in the row type
-    can not order by the field 'd', it has an array type 'float64[]', not supported yet
+    can not order by the field 'd', it has an array type 'float64\[\]', not supported yet
     the row type is:
-    row {
+    row \{
       uint8 a,
-      uint8[] b,
+      uint8\[\] b,
       int64 c,
-      float64[] d,
+      float64\[\] d,
       string e,
-    }");
+    \} at/);
 }
 
 #########################
@@ -173,7 +172,6 @@ ok(ref $rt1, "Triceps::RowType");
 	ok($res, "table (\n  row {\n    int32 a\"b,\n  }\n) {\n  index PerlSortedIndex(SimpleOrder a\\\"b ASC, ) sorted,\n}");
 
 	$res = $tt1->initialize();
-	#print "$!\n";
 	ok($res);
 
 	my $tt2 = Triceps::TableType->new($rt2)

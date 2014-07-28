@@ -1,5 +1,5 @@
 //
-// (C) Copyright 2011-2013 Sergey A. Babkin.
+// (C) Copyright 2011-2014 Sergey A. Babkin.
 // This file is a part of Triceps.
 // See the file COPYRIGHT for the copyright notice and license information
 //
@@ -59,6 +59,11 @@ public:
 		idx_(other->idx_)
 	{ }
 
+	virtual SortedIndexCondition *copy() const
+	{
+		return new Int32SortCondition(*this);
+	}
+
 	virtual TreeIndexType::Less *tableCopy(Table *t) const
 	{
 		return new Int32SortCondition(this, t);
@@ -68,16 +73,16 @@ public:
 	{
 		SortedIndexCondition::initialize(errors, tabtype, indtype);
 		if (idx_ < 0)
-			errors->appendMsg(true, "The index must not be negative.");
+			errors.f("The index must not be negative.");
 		if (rt_->fieldCount() <= idx_)
-			errors->appendMsg(true, strprintf("The row type must contain at least %d fields.", idx_+1));
+			errors.f("The row type must contain at least %d fields.", idx_+1);
 
 		if (!errors->hasError()) { // can be checked only if index is within range
 			const RowType::Field &fld = rt_->fields()[idx_];
 			if (fld.type_->getTypeId() != Type::TT_INT32)
-				errors->appendMsg(true, strprintf("The field at index %d must be an int32.", idx_));
+				errors.f("The field at index %d must be an int32.", idx_);
 			if (fld.arsz_ != RowType::Field::AR_SCALAR)
-				errors->appendMsg(true, strprintf("The field at index %d must not be an array.", idx_));
+				errors.f("The field at index %d must not be an array.", idx_);
 		}
 	}
 
@@ -87,17 +92,15 @@ public:
 		Int32SortCondition *other = (Int32SortCondition *)sc;
 		return idx_ == other->idx_;
 	}
+
 	virtual bool match(const SortedIndexCondition *sc) const
 	{
 		return equals(sc);
 	}
+
 	virtual void printTo(string &res, const string &indent = "", const string &subindent = "  ") const
 	{
 		res.append(strprintf("Int32Sort(%d)", idx_));
-	}
-	virtual SortedIndexCondition *copy() const
-	{
-		return new Int32SortCondition(*this);
 	}
 
 	virtual bool operator() (const RowHandle *rh1, const RowHandle *rh2) const
@@ -174,7 +177,7 @@ UTESTCASE sortedIndexInt32(Utest *utest)
 
 	// make a table, some rows, and check the order
 	Autoref<Unit> unit = new Unit("u");
-	Autoref<Table> t = tt->makeTable(unit, Table::EM_CALL, "t");
+	Autoref<Table> t = tt->makeTable(unit, "t");
 
 	FdataVec dv;
 	mkfdata(dv);
@@ -233,6 +236,11 @@ public:
 		key_(other->key_)
 	{ }
 
+	virtual SortedIndexCondition *copy() const
+	{
+		return new MultiInt32SortCondition(*this);
+	}
+
 	virtual TreeIndexType::Less *tableCopy(Table *t) const
 	{
 		return new MultiInt32SortCondition(this, t);
@@ -247,16 +255,16 @@ public:
 			const string &s = (*key_)[i];
 			int n = rt_->findIdx(s);
 			if (n < 0) {
-				errors->appendMsg(true, strprintf("No such field '%s'.", s.c_str()));
+				errors.f("No such field '%s'.", s.c_str());
 				continue;
 			}
 			const RowType::Field &fld = rt_->fields()[n];
 			if (fld.type_->getTypeId() != Type::TT_INT32) {
-				errors->appendMsg(true, strprintf("The field '%s' must be an int32.", s.c_str()));
+				errors.f("The field '%s' must be an int32.", s.c_str());
 				continue;
 			}
 			if (fld.arsz_ != RowType::Field::AR_SCALAR) {
-				errors->appendMsg(true, strprintf("The field '%s' must not be an array.", s.c_str()));
+				errors.f("The field '%s' must not be an array.", s.c_str());
 				continue;
 			}
 			idxs_.push_back(n);
@@ -315,12 +323,7 @@ public:
 		res.append(")");
 	}
 
-	virtual SortedIndexCondition *copy() const
-	{
-		return new MultiInt32SortCondition(*this);
-	}
-
-	virtual const_Onceref<NameSet> getKey() const
+	virtual const NameSet *getKey() const
 	{
 		return key_;
 	}
@@ -407,15 +410,15 @@ UTESTCASE sortedIndexMultiInt32(Utest *utest)
 		fflush(stdout);
 	}
 
-	const_Autoref<NameSet> key = it->getKey();
-	UT_ASSERT(!key.isNull());
+	const NameSet *key = it->getKey();
+	UT_ASSERT(key != NULL);
 	UT_IS(key->size(), 2);
 	UT_IS(key->at(0), "b");
 	UT_IS(key->at(1), "c");
 
 	// make a table, some rows, and check the order
 	Autoref<Unit> unit = new Unit("u");
-	Autoref<Table> t = tt->makeTable(unit, Table::EM_CALL, "t");
+	Autoref<Table> t = tt->makeTable(unit, "t");
 
 	FdataVec dv;
 	mkfdata(dv);
@@ -496,6 +499,11 @@ public:
 		seq_(other->seq_)
 	{ }
 
+	virtual SortedIndexCondition *copy() const
+	{
+		return new SeqSortCondition(*this);
+	}
+
 	virtual TreeIndexType::Less *tableCopy(Table *t) const
 	{
 		return new SeqSortCondition(this, t);
@@ -520,11 +528,6 @@ public:
 	virtual void printTo(string &res, const string &indent = "", const string &subindent = "  ") const
 	{
 		res.append("Sequenced");
-	}
-
-	virtual SortedIndexCondition *copy() const
-	{
-		return new SeqSortCondition(*this);
 	}
 
 	virtual size_t sizeOfRhSection() const
@@ -559,14 +562,14 @@ public:
 	
 	// Helper method to read the sequence from the row handle,
 	// can also be used by the end-user. The row handle must as usual
-	// belong to this table.
+	// belong to a table of this type.
 	int64_t getSeq(const RowHandle *rh) const
 	{
 	    return rh->get<SeqRhSection>(rhOffset_)->seq_;
 	}
 
 	// Helper method to set the sequence in the row handle.
-	// May be used only on the rows that are not in table.
+	// May be used only on the rows that are not in a table.
 	void setSeq(const RowHandle *rh, int64_t val) const
 	{
 		if (rh->isInTable()) {
@@ -635,12 +638,12 @@ UTESTCASE sortedIndexSeq(Utest *utest)
 		fflush(stdout);
 	}
 
-	const_Autoref<NameSet> key = it->getKey();
-	UT_ASSERT(key.isNull());
+	const NameSet *key = it->getKey();
+	UT_ASSERT(key == NULL);
 
 	// make a table, some rows, and check the order
 	Autoref<Unit> unit = new Unit("u");
-	Autoref<Table> t = tt->makeTable(unit, Table::EM_CALL, "t");
+	Autoref<Table> t = tt->makeTable(unit, "t");
 
 	FdataVec dv;
 	mkfdata(dv);

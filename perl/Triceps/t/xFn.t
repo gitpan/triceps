@@ -1,5 +1,5 @@
 #
-# (C) Copyright 2011-2013 Sergey A. Babkin.
+# (C) Copyright 2011-2014 Sergey A. Babkin.
 # This file is a part of Triceps.
 # See the file COPYRIGHT for the copyright notice and license information
 #
@@ -45,7 +45,7 @@ my $rtFib = Triceps::RowType->new(
 	iter => "int32", # number of iterations left to do
 	cur => "int64", # current number
 	prev => "int64", # previous number
-) or confess "$!";
+);
 
 # Input: 
 #   $lbFibCompute: request to do a step. iter will be decremented,
@@ -76,7 +76,7 @@ my $lbFibCompute = $uFib->makeLabel($rtFib, "FibCompute", undef, sub {
 		cur => $cur,
 		prev => $prev,
 	);
-}) or confess "$!";
+});
 
 # End of streaming function
 ###
@@ -114,7 +114,7 @@ my $lbMain = $uFib->makeLabel($rtFib, "Main", undef, sub {
 		}
 	}
 	&send(" is Fibonacci number ", $row->get("iter"), "\n");
-}) or confess "$!";
+});
 
 while(&readLine) {
 	chomp;
@@ -158,7 +158,7 @@ my $rtFib = Triceps::RowType->new(
 	iter => "int32", # number of iterations left to do
 	cur => "int64", # current number
 	prev => "int64", # previous number
-) or confess "$!";
+);
 
 my $lbPrint = $uFib->makeLabel($rtFib, "Print", undef, sub {
 	&send($_[1]->getRow()->get("cur"));
@@ -197,7 +197,7 @@ my $lbFibCompute = $uFib->makeLabel($rtFib, "FibCompute", undef, sub {
 		cur => $cur,
 		prev => $prev,
 	);
-}) or confess "$!";
+});
 
 # End of streaming function
 ###
@@ -230,7 +230,7 @@ my $lbMain = $uFib->makeLabel($rtFib, "Main", undef, sub {
 		}
 	}
 	&send(" is Fibonacci number ", $row->get("iter"), "\n");
-}) or confess "$!";
+});
 
 while(&readLine) {
 	chomp;
@@ -273,13 +273,13 @@ $uFib->setMaxRecursionDepth(100);
 # Type the data going into the function
 my $rtFibArg = Triceps::RowType->new(
 	idx => "int32", # the index of Fibonacci number to generate
-) or confess "$!";
+);
 
 # Type of the function result
 my $rtFibRes = Triceps::RowType->new(
 	idx => "int32", # the index of Fibonacci number
 	fib => "int64", # the generated Fibonacci number
-) or confess "$!";
+);
 
 ###
 # A streaming function that computes a Fibonacci number.
@@ -345,7 +345,7 @@ $lbFibCompute = $uFib->makeLabel($rtFibArg, "FibCompute", undef, sub {
 		idx => $idx,
 		fib => $res,
 	);
-}) or confess "$!";
+});
 
 # End of streaming function
 ###
@@ -366,12 +366,10 @@ my $fbFibCall = Triceps::FnBinding->new(
 while(&readLine) {
 	chomp;
 	my @data = split(/,/);
-	{
-		my $ab = Triceps::AutoFnBind->new(
-			$frFib => $fbFibCall,
-		);
-		$uFib->makeArrayCall($lbFibCompute, @data);
-	}
+	$uFib->callBound(
+		$lbFibCompute->makeRowopArray(@data),
+		$frFib => $fbFibCall,
+	);
 	$uFib->drainFrame(); # just in case, for completeness
 }
 
@@ -410,13 +408,13 @@ $uFib->setMaxRecursionDepth(100);
 # Type the data going into the function
 my $rtFibArg = Triceps::RowType->new(
 	idx => "int32", # the index of Fibonacci number to generate
-) or confess "$!";
+);
 
 # Type of the function result
 my $rtFibRes = Triceps::RowType->new(
 	idx => "int32", # the index of Fibonacci number
 	fib => "int64", # the generated Fibonacci number
-) or confess "$!";
+);
 
 ###
 # A streaming function that computes a Fibonacci number.
@@ -485,7 +483,7 @@ $lbFibCompute = $uFib->makeLabel($rtFibArg, "FibCompute", undef, sub {
 		idx => $idx,
 		fib => $res,
 	);
-}) or confess "$!";
+});
 
 # End of streaming function
 ###
@@ -552,13 +550,13 @@ $uFib->setTracer(Triceps::UnitTracerStringName->new(verbose => 1));
 # Type the data going into the function
 my $rtFibArg = Triceps::RowType->new(
 	idx => "int32", # the index of Fibonacci number to generate
-) or confess "$!";
+);
 
 # Type of the function result
 my $rtFibRes = Triceps::RowType->new(
 	idx => "int32", # the index of Fibonacci number
 	fib => "int64", # the generated Fibonacci number
-) or confess "$!";
+);
 
 ###
 # A streaming function that computes a Fibonacci number.
@@ -605,7 +603,7 @@ $lbFibCompute = $uFib->makeLabel($rtFibArg, "FibCompute", undef, sub {
 			idx => $idx - 1,
 		);
 	}
-}) or confess "$!";
+});
 $fbFibPrev1 = Triceps::FnBinding->new(
 	unit => $uFib,
 	name => "FibPrev1",
@@ -662,12 +660,10 @@ my $fbFibCall = Triceps::FnBinding->new(
 while(&readLine) {
 	chomp;
 	my @data = split(/,/);
-	{
-		my $ab = Triceps::AutoFnBind->new(
-			$frFib => $fbFibCall,
-		);
-		$uFib->makeArrayCall($lbFibCompute, @data);
-	}
+	$uFib->callBound(
+		$lbFibCompute->makeRowopArray(@data),
+		$frFib => $fbFibCall,
+	);
 	$uFib->drainFrame(); # just in case, for completeness
 	&send($uFib->getTracer()->print()); # print the trace, it's entertaining
 	$uFib->getTracer()->clearBuffer();
@@ -974,13 +970,13 @@ $uFib->setTracer(Triceps::UnitTracerStringName->new(verbose => 1));
 # Type the data going into the function
 my $rtFibArg = Triceps::RowType->new(
 	idx => "int32", # the index of Fibonacci number to generate
-) or confess "$!";
+);
 
 # Type of the function result
 my $rtFibRes = Triceps::RowType->new(
 	idx => "int32", # the index of Fibonacci number
 	fib => "int64", # the generated Fibonacci number
-) or confess "$!";
+);
 
 ###
 # A streaming function that computes a Fibonacci number.
@@ -1032,7 +1028,7 @@ $lbFibCompute = $uFib->makeLabel($rtFibArg, "FibCompute", undef, sub {
 		}
 		$fbFibPrev1->callTray();
 	}
-}) or confess "$!";
+});
 $fbFibPrev1 = Triceps::FnBinding->new(
 	unit => $uFib,
 	name => "FibPrev1",
@@ -1092,12 +1088,10 @@ my $fbFibCall = Triceps::FnBinding->new(
 while(&readLine) {
 	chomp;
 	my @data = split(/,/);
-	{
-		my $ab = Triceps::AutoFnBind->new(
-			$frFib => $fbFibCall,
-		);
-		$uFib->makeArrayCall($lbFibCompute, @data);
-	}
+	$uFib->callBound(
+		$lbFibCompute->makeRowopArray(@data),
+		$frFib => $fbFibCall,
+	);
 	$uFib->drainFrame(); # just in case, for completeness
 	&send($uFib->getTracer()->print()); # print the trace, it's entertaining
 	$uFib->getTracer()->clearBuffer();
@@ -1404,13 +1398,13 @@ $uFib->setTracer(Triceps::UnitTracerStringName->new(verbose => 1));
 # Type the data going into the function
 my $rtFibArg = Triceps::RowType->new(
 	idx => "int32", # the index of Fibonacci number to generate
-) or confess "$!";
+);
 
 # Type of the function result
 my $rtFibRes = Triceps::RowType->new(
 	idx => "int32", # the index of Fibonacci number
 	fib => "int64", # the generated Fibonacci number
-) or confess "$!";
+);
 
 ###
 # A streaming function that computes a Fibonacci number.
@@ -1457,7 +1451,7 @@ $lbFibCompute = $uFib->makeLabel($rtFibArg, "FibCompute", undef, sub {
 			idx => $idx - 1,
 		));
 	}
-}) or confess "$!";
+});
 $fbFibPrev1 = Triceps::FnBinding->new(
 	unit => $uFib,
 	name => "FibPrev1",
@@ -1514,12 +1508,10 @@ my $fbFibCall = Triceps::FnBinding->new(
 while(&readLine) {
 	chomp;
 	my @data = split(/,/);
-	{
-		my $ab = Triceps::AutoFnBind->new(
-			$frFib => $fbFibCall,
-		);
-		$uFib->makeArrayCall($lbFibCompute, @data);
-	}
+	$uFib->callBound(
+		$lbFibCompute->makeRowopArray(@data),
+		$frFib => $fbFibCall,
+	);
 	$uFib->drainFrame(); # just in case, for completeness
 	#&send($uFib->getTracer()->print()); # print the trace, it's entertaining
 	$uFib->getTracer()->clearBuffer();
@@ -1564,13 +1556,13 @@ $uFib->setTracer(Triceps::UnitTracerStringName->new(verbose => 1));
 # Type the data going into the function
 my $rtFibArg = Triceps::RowType->new(
 	idx => "int32", # the index of Fibonacci number to generate
-) or confess "$!";
+);
 
 # Type of the function result
 my $rtFibRes = Triceps::RowType->new(
 	idx => "int32", # the index of Fibonacci number
 	fib => "int64", # the generated Fibonacci number
-) or confess "$!";
+);
 
 ###
 # A streaming function that computes a Fibonacci number.
@@ -1618,11 +1610,11 @@ $lbFibCompute = $uFib->makeLabel($rtFibArg, "FibCompute", undef, sub {
 		));
 		$uFib->fork($lbFibPop1->makeRowopArray($op));
 	}
-}) or confess "$!";
+});
 $lbFibPop1 = $uFib->makeLabel($uFib->getEmptyRowType(), "FibPop1", undef, sub {
 	$frFib->pop($fbFibPrev1);
 	$fbFibPrev1->callTray();
-}) or confess "$!";
+});
 $fbFibPrev1 = Triceps::FnBinding->new(
 	unit => $uFib,
 	name => "FibPrev1",
@@ -1646,7 +1638,7 @@ $fbFibPrev1 = Triceps::FnBinding->new(
 $lbFibPop2 = $uFib->makeLabel($uFib->getEmptyRowType(), "FibPop2", undef, sub {
 	$frFib->pop($fbFibPrev2);
 	$fbFibPrev2->callTray();
-}) or confess "$!";
+});
 $fbFibPrev2 = Triceps::FnBinding->new(
 	unit => $uFib,
 	on => $frFib,
@@ -1682,12 +1674,10 @@ my $fbFibCall = Triceps::FnBinding->new(
 while(&readLine) {
 	chomp;
 	my @data = split(/,/);
-	{
-		my $ab = Triceps::AutoFnBind->new(
-			$frFib => $fbFibCall,
-		);
-		$uFib->makeArrayCall($lbFibCompute, @data);
-	}
+	$uFib->callBound(
+		$lbFibCompute->makeRowopArray(@data),
+		$frFib => $fbFibCall,
+	);
 	$uFib->drainFrame(); # just in case, for completeness
 	#&send($uFib->getTracer()->print()); # print the trace, it's entertaining
 	$uFib->getTracer()->clearBuffer();
@@ -1798,7 +1788,7 @@ our $rtData = Triceps::RowType->new(
 	local_ip => "string",
 	remote_ip => "string",
 	bytes => "int64",
-) or confess "$!";
+);
 
 my $collapse = FnCollapse->new(
 	unit => $unit,
@@ -2014,7 +2004,7 @@ our $rtData = Triceps::RowType->new(
 	local_ip => "string",
 	remote_ip => "string",
 	bytes => "int64",
-) or confess "$!";
+);
 
 my $collapse = FnCollapseClose->new(
 	unit => $unit,
@@ -2145,7 +2135,7 @@ our $rtData = Triceps::RowType->new(
 	local_ip => "string",
 	remote_ip => "string",
 	bytes => "int64",
-) or confess "$!";
+);
 
 my $collapse = FnCollapseClose3->new(
 	unit => $unit,
@@ -2271,14 +2261,14 @@ my $unit = Triceps::Unit->new("unit");
 my $rtIsin = Triceps::RowType->new(
 	ric => "string",
 	isin => "string",
-) or confess "$!";
+);
 
 my $ttIsin = Triceps::TableType->new($rtIsin)
 	->addSubIndex("byRic", Triceps::IndexType->newHashed(key => [ "ric" ])
-) or confess "$!"; 
-$ttIsin->initialize() or confess "$!";
+); 
+$ttIsin->initialize();
 
-my $tIsin = $unit->makeTable($ttIsin, "EM_CALL", "tIsin") or confess "$!";
+my $tIsin = $unit->makeTable($ttIsin, "tIsin");
 
 # the results will come from here
 my $fretLookupIsin = Triceps::FnReturn->new(
@@ -2304,7 +2294,7 @@ my $lbLookupIsin = $unit->makeLabel($rtIsin, "lbLookupIsin", undef, sub {
 		}
 	}
 	$unit->call($fretLookupIsin->getLabel("result")->makeRowop("OP_INSERT", $row));
-}) or confess "$!";
+});
 
 ###########
 
@@ -2316,7 +2306,7 @@ my $rtTrade = Triceps::RowType->new(
 	isin => "string",
 	size => "float64",
 	price => "float64",
-) or confess "$!";
+);
 
 my $lbTradeEnriched = $unit->makeDummyLabel($rtTrade, "lbTradeEnriched");
 my $lbTrade = $unit->makeLabel($rtTrade, "lbTrade", undef, sub {
@@ -2416,7 +2406,7 @@ sub makePipePrintLabel($$$) # ($print_label_name, $parent_label, $out_label)
 		undef, sub { # (label, rowop)
 			$unit->makeArrayCall(
 				$lbOutput, "OP_INSERT", $_[1]->printP());
-		}) or confess "$!";
+		});
 	$lbParent->chain($lb);
 	return $lb;
 }
@@ -2429,7 +2419,7 @@ my $unit = Triceps::Unit->new("unit");
 # format of a row with one string field.
 my $rtString = Triceps::RowType->new(
 	s => "string"
-) or confess "$!";
+);
 
 # All the input gets sent here.
 my $lbReceive = $unit->makeDummyLabel($rtString, "lbReceive");
@@ -2487,7 +2477,7 @@ my $retEncrypt = Triceps::FnReturn->new(
 		data => $rtString,
 	],
 );
-my $lbEncrypt = $retEncrypt->getLabel("data") or confess "$!";
+my $lbEncrypt = $retEncrypt->getLabel("data");
 my $bindEncrypt = Triceps::FnBinding->new(
 	name => "bindEncrypt",
 	on => $retReceive,
@@ -2508,7 +2498,7 @@ my $retDecrypt = Triceps::FnReturn->new(
 		data => $rtString,
 	],
 );
-my $lbDecrypt = $retDecrypt->getLabel("data") or confess "$!";
+my $lbDecrypt = $retDecrypt->getLabel("data");
 my $bindDecrypt = Triceps::FnBinding->new(
 	name => "bindDecrypt",
 	on => $retReceive,
@@ -2525,7 +2515,7 @@ my $bindDecrypt = Triceps::FnBinding->new(
 my $rtData = Triceps::RowType->new(
 	name => "string",
 	count => "int32",
-) or confess "$!";
+);
 
 my $lbIncResult = $unit->makeDummyLabel($rtData, "result");
 my $lbInc = $unit->makeLabel($rtData, "inc", undef, sub {
@@ -2534,7 +2524,7 @@ my $lbInc = $unit->makeLabel($rtData, "inc", undef, sub {
 		name  => $row->get("name"),
 		count => $row->get("count") + 1,
 	);
-}) or confess ("$!");
+});
 makePipePrintLabel("printResult", $lbIncResult, $lbOutput);
 
 %dispatch = (
@@ -2601,7 +2591,7 @@ my $unit = Triceps::Unit->new("unit");
 # format of a row with one string field.
 my $rtString = Triceps::RowType->new(
 	s => "string"
-) or confess "$!";
+);
 
 # All the input gets sent here.
 my $lbReceive = $unit->makeDummyLabel($rtString, "lbReceive");
@@ -2661,7 +2651,7 @@ my $retEncrypt = Triceps::FnReturn->new(
 		data => $rtString,
 	],
 );
-my $lbEncrypt = $retEncrypt->getLabel("data") or confess "$!";
+my $lbEncrypt = $retEncrypt->getLabel("data");
 my $bindEncrypt = Triceps::FnBinding->new(
 	name => "bindEncrypt",
 	on => $retReceive,
@@ -2683,7 +2673,7 @@ my $retDecrypt = Triceps::FnReturn->new(
 		data => $rtString,
 	],
 );
-my $lbDecrypt = $retDecrypt->getLabel("data") or confess "$!";
+my $lbDecrypt = $retDecrypt->getLabel("data");
 my $bindDecrypt = Triceps::FnBinding->new(
 	name => "bindDecrypt",
 	on => $retReceive,
@@ -2701,7 +2691,7 @@ my $bindDecrypt = Triceps::FnBinding->new(
 my $rtData = Triceps::RowType->new(
 	name => "string",
 	count => "int32",
-) or confess "$!";
+);
 
 my $lbIncResult = $unit->makeDummyLabel($rtData, "result");
 my $lbInc = $unit->makeLabel($rtData, "inc", undef, sub {
@@ -2710,7 +2700,7 @@ my $lbInc = $unit->makeLabel($rtData, "inc", undef, sub {
 		name  => $row->get("name"),
 		count => $row->get("count") + 1,
 	);
-}) or confess ("$!");
+});
 makePipePrintLabel("printResult", $lbIncResult, $lbOutput);
 
 %dispatch = (
